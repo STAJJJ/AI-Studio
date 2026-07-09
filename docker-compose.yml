@@ -1,0 +1,13 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-studio-backend
+    ports:
+      - "8001:8000"
+    environment:
+      AI_STUDIO_ENVIRONMENT: development
+      AI_STUDIO_LOG_LEVEL: INFO
+    volumes:
+      - ./data:/app/data
