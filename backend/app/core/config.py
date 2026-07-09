@@ -1,8 +1,12 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -13,6 +17,11 @@ class Settings(BaseSettings):
     environment: Literal["local", "development", "staging", "production"] = "local"
     debug: bool = False
     log_level: str = "INFO"
+    max_file_size_bytes: int = Field(default=10 * 1024 * 1024, description="Maximum upload size in bytes.")
+    allowed_mime_types: set[str] = Field(default={"image/jpeg", "image/png", "image/webp"})
+    upload_dir: Path = Field(default=PROJECT_ROOT / "data" / "uploads")
+    output_dir: Path = Field(default=PROJECT_ROOT / "data" / "outputs")
+    mock_executor_delay_seconds: float = 2.0
 
     model_config = SettingsConfigDict(
         env_file=".env",
