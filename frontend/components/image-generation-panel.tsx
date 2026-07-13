@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,29 +10,88 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useImageGeneration } from "@/hooks/use-image-generation";
+import { resolveApiAssetUrl } from "@/services/api";
+import type { GenerateImageRequest } from "@/types/image";
 
+const currentModel = "FLUX.1 Schnell FP8";
 const defaultPrompt =
-  "A cinematic portrait of a young man in a modern photography studio, realistic skin texture, soft lighting, detailed face, professional photography";
+  "A cinematic portrait of a young man in a modern studio, realistic photography, soft lighting, detailed face";
+
+const statusCopy = {
+  idle: {
+    title: "Ready to generate",
+    description: "Enter a prompt and submit a FLUX image task through the AI Studio gateway.",
+  },
+  generating: {
+    title: "Generating image",
+    description: "ComfyUI is processing the prompt. This can take a few minutes on first model load.",
+  },
+  completed: {
+    title: "Image ready",
+    description: "The generated PNG is available for preview and download.",
+  },
+  failed: {
+    title: "Generation failed",
+    description: "The image task did not complete successfully.",
+  },
+} as const;
+
+function formatDimensions(request: GenerateImageRequest | null): string {
+  if (!request) {
+    return "-";
+  }
+
+  return `${request.width} x ${request.height}`;
+}
 
 export function ImageGenerationPanel() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
-  const { phase, isGenerating, result, status, error, submit } = useImageGeneration();
+  const { phase, isGenerating, activeRequest, result, status, error, submit } = useImageGeneration();
+
+  const imageUrl = useMemo(
+    () => resolveApiAssetUrl(status?.status === "completed" ? status.image_url : null),
+    [status],
+  );
+  const taskId = result?.task_id ?? status?.task_id ?? null;
+  const progress = status?.progress ?? (phase === "generating" ? 0 : null);
+  const canSubmit = !isGenerating && prompt.trim().length > 0;
+  const submittedPrompt = activeRequest?.prompt ?? prompt;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await submit({ prompt, width, height });
+    if (!canSubmit) {
+      return;
+    }
+
+    await submit({ prompt: prompt.trim(), width, height });
   }
 
-  const imageUrl = status?.status === "completed" ? status.image_url : null;
+  async function handleGenerateAgain() {
+    if (!canSubmit) {
+      return;
+    }
+
+    await submit({ prompt: prompt.trim(), width, height });
+  }
+
+  async function handleRetry() {
+    const retryRequest = activeRequest ?? { prompt: prompt.trim(), width, height };
+    if (isGenerating || retryRequest.prompt.trim().length === 0) {
+      return;
+    }
+
+    await submit(retryRequest);
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-8">
-      <header className="flex items-center justify-between gap-4">
-        <div>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">Text to Image</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal">Generate Image</h1>
+          <h1 className="text-3xl font-semibold tracking-normal">Generate Image</h1>
+          <p className="text-sm text-muted-foreground">Current Model: {currentModel}</p>
         </div>
         <Button asChild variant="outline">
           <Link href="/">
@@ -46,16 +105,22 @@ export function ImageGenerationPanel() {
         <Card>
           <CardHeader>
             <CardTitle>Prompt</CardTitle>
-            <CardDescription>Submit a ComfyUI FLUX task through FastAPI.</CardDescription>
+            <CardDescription>Submit one ComfyUI FLUX task at a time through FastAPI.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Model</span>
+                <span className="ml-2 font-medium text-foreground">{currentModel}</span>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="prompt">Prompt</Label>
                 <Textarea
                   id="prompt"
                   value={prompt}
                   onChange={(event) => setPrompt(event.target.value)}
+                  placeholder="Describe the image you want to generate"
                   required
                 />
               </div>
@@ -89,73 +154,141 @@ export function ImageGenerationPanel() {
                 </div>
               </div>
 
-              <Button className="w-full" disabled={isGenerating || prompt.trim().length === 0} type="submit">
-                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-                {isGenerating ? "Generating" : "Generate"}
+              <Button className="w-full" disabled={!canSubmit} type="submit">
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                {isGenerating ? "Generating..." : "Generate"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        <Card className="min-h-[480px]">
+        <Card className="min-h-[560px]">
           <CardHeader>
-            <CardTitle>Result</CardTitle>
-            <CardDescription>Task response and generated image.</CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>{statusCopy[phase].title}</CardTitle>
+                <CardDescription>{statusCopy[phase].description}</CardDescription>
+              </div>
+              <span className="rounded-md border bg-background px-3 py-1 text-sm font-medium capitalize text-foreground">
+                {phase}
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed bg-muted/40 p-6">
+            <div className="flex min-h-96 rounded-lg border border-dashed bg-muted/30 p-5">
               {phase === "idle" ? (
-                <p className="text-center text-sm text-muted-foreground">Generated task details will appear here.</p>
-              ) : phase === "failed" ? (
-                <div className="w-full max-w-xl rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
-                  {error ?? "Image generation failed."}
+                <div className="m-auto max-w-md space-y-3 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Sparkles className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Your task ID, generation status, image preview, and download action will appear here.
+                  </p>
                 </div>
-              ) : (
-                <div className="w-full max-w-2xl rounded-lg border bg-card p-5">
-                  <div className="space-y-4">
-                    {result ? (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Task ID</p>
-                        <p className="mt-1 break-all font-mono text-sm">{result.task_id}</p>
-                      </div>
-                    ) : null}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Status</p>
-                        <p className="mt-1 text-sm font-medium capitalize text-secondary">{phase}</p>
-                      </div>
-                      {status ? (
-                        <p className="text-sm text-muted-foreground">Progress {status.progress}%</p>
-                      ) : null}
-                    </div>
+              ) : null}
 
-                    {phase === "generating" ? (
-                      <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        Waiting for ComfyUI result
-                      </div>
-                    ) : null}
-
-                    {imageUrl ? (
-                      <div className="space-y-4">
-                        <div className="overflow-hidden rounded-md border bg-background">
-                          <img className="h-auto w-full" src={imageUrl} alt="Generated image" />
-                        </div>
-                        <Button asChild variant="outline">
-                          <a href={imageUrl} download>
-                            <Download className="h-4 w-4" aria-hidden="true" />
-                            Download
-                          </a>
-                        </Button>
-                      </div>
-                    ) : null}
+              {phase === "generating" ? (
+                <div className="w-full space-y-5 rounded-lg border bg-card p-5">
+                  <TaskMeta taskId={taskId} status={status?.status ?? "running"} progress={progress} />
+                  <div className="rounded-md bg-muted px-3 py-3 text-sm text-muted-foreground">
+                    Waiting for ComfyUI to finish the FLUX inference. Polling will stop automatically when the task
+                    completes or fails.
                   </div>
                 </div>
-              )}
+              ) : null}
+
+              {phase === "completed" ? (
+                <div className="w-full space-y-5">
+                  {imageUrl ? (
+                    <div className="overflow-hidden rounded-md border bg-background">
+                      <img className="h-auto w-full" src={imageUrl} alt="Generated image preview" />
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 rounded-lg border bg-card p-5 md:grid-cols-2">
+                    <TaskMeta taskId={taskId} status={status?.status ?? "completed"} progress={progress} />
+                    <div className="space-y-3">
+                      <InfoRow label="Dimensions" value={formatDimensions(activeRequest)} />
+                      <InfoRow label="Prompt" value={submittedPrompt} multiline />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {imageUrl ? (
+                      <Button asChild variant="outline">
+                        <a href={imageUrl} download>
+                          <Download className="h-4 w-4" aria-hidden="true" />
+                          Download PNG
+                        </a>
+                      </Button>
+                    ) : null}
+                    <Button disabled={!canSubmit} onClick={handleGenerateAgain} type="button">
+                      <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                      Generate Again
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {phase === "failed" ? (
+                <div className="w-full space-y-5 rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+                  <TaskMeta taskId={taskId} status={status?.status ?? "failed"} progress={progress} />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-destructive">Unable to complete image generation.</p>
+                    <p className="text-sm text-destructive/90">
+                      {error ?? "Image generation failed. Please retry with the same prompt."}
+                    </p>
+                  </div>
+                  <Button disabled={isGenerating} onClick={handleRetry} type="button" variant="outline">
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Retry
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
       </section>
     </main>
+  );
+}
+
+interface TaskMetaProps {
+  taskId: string | null;
+  status: string;
+  progress: number | null;
+}
+
+function TaskMeta({ taskId, status, progress }: TaskMetaProps) {
+  return (
+    <div className="space-y-3">
+      <InfoRow label="Task ID" value={taskId ?? "Waiting for task"} mono />
+      <InfoRow label="Status" value={status} />
+      <InfoRow label="Progress" value={progress === null ? "-" : `${progress}%`} />
+    </div>
+  );
+}
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+  mono?: boolean;
+  multiline?: boolean;
+}
+
+function InfoRow({ label, value, mono = false, multiline = false }: InfoRowProps) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={[
+          "break-words text-sm font-medium text-foreground",
+          mono ? "font-mono" : "",
+          multiline ? "leading-6" : "",
+        ].join(" ")}
+      >
+        {value}
+      </p>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import os
+import uuid
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -63,6 +64,7 @@ class ImageService:
             width=request.width,
             height=request.height,
         )
+        self._prepare_unique_workflow_run(workflow)
         prompt_id = self._client.submit_workflow(workflow)
         return ImageGenerationResponse(task_id=prompt_id, status="running")
 
@@ -104,6 +106,24 @@ class ImageService:
         if not path.is_file():
             raise ImageResultNotFoundError(f"Image result not found: {filename}")
         return path
+
+    def _prepare_unique_workflow_run(self, workflow: dict[str, Any]) -> None:
+        run_id = uuid.uuid4()
+        seed = run_id.int % (2**63 - 1)
+        suffix = run_id.hex[:12]
+
+        for node in workflow.values():
+            if not isinstance(node, dict):
+                continue
+            inputs = node.get("inputs")
+            if not isinstance(inputs, dict):
+                continue
+
+            if node.get("class_type") == "KSampler" and "seed" in inputs:
+                inputs["seed"] = seed
+
+            if node.get("class_type") == "SaveImage" and isinstance(inputs.get("filename_prefix"), str):
+                inputs["filename_prefix"] = f'{inputs["filename_prefix"]}_{suffix}'
 
     def _extract_first_output_filename(self, task_history: dict[str, Any]) -> str | None:
         outputs = task_history.get("outputs", {})

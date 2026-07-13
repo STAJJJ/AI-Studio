@@ -10,6 +10,7 @@ type ImageGenerationPhase = "idle" | "generating" | "completed" | "failed";
 interface UseImageGenerationResult {
   phase: ImageGenerationPhase;
   isGenerating: boolean;
+  activeRequest: GenerateImageRequest | null;
   result: GenerateImageResponse | null;
   status: ImageGenerationStatusResponse | null;
   error: string | null;
@@ -20,17 +21,24 @@ const POLL_INTERVAL_MS = 2000;
 
 export function useImageGeneration(): UseImageGenerationResult {
   const [phase, setPhase] = useState<ImageGenerationPhase>("idle");
+  const [activeRequest, setActiveRequest] = useState<GenerateImageRequest | null>(null);
   const [result, setResult] = useState<GenerateImageResponse | null>(null);
   const [status, setStatus] = useState<ImageGenerationStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestTokenRef = useRef(0);
+  const isGeneratingRef = useRef(false);
 
   function clearPollTimer() {
     if (pollTimeoutRef.current !== null) {
       clearTimeout(pollTimeoutRef.current);
       pollTimeoutRef.current = null;
     }
+  }
+
+  function finishGeneration() {
+    isGeneratingRef.current = false;
+    clearPollTimer();
   }
 
   function schedulePoll(taskId: string, requestToken: number) {
@@ -54,21 +62,21 @@ export function useImageGeneration(): UseImageGenerationResult {
       setStatus(nextStatus);
 
       if (nextStatus.status === "completed") {
-        clearPollTimer();
+        finishGeneration();
         if (nextStatus.image_url) {
           setPhase("completed");
           setError(null);
         } else {
           setPhase("failed");
-          setError("Image generation completed without an output image.");
+          setError("Image generation completed, but ComfyUI did not return an output image.");
         }
         return;
       }
 
       if (nextStatus.status === "failed") {
-        clearPollTimer();
+        finishGeneration();
         setPhase("failed");
-        setError("Image generation failed.");
+        setError("Image generation failed in ComfyUI. Please retry with the same prompt.");
         return;
       }
 
@@ -77,18 +85,24 @@ export function useImageGeneration(): UseImageGenerationResult {
       if (requestTokenRef.current !== requestToken) {
         return;
       }
-      clearPollTimer();
+      finishGeneration();
       setPhase("failed");
       setError(caught instanceof Error ? caught.message : "Image generation status polling failed");
     }
   }
 
   async function submit(request: GenerateImageRequest) {
+    if (isGeneratingRef.current) {
+      return;
+    }
+
+    isGeneratingRef.current = true;
     requestTokenRef.current += 1;
     const requestToken = requestTokenRef.current;
 
     clearPollTimer();
     setPhase("generating");
+    setActiveRequest(request);
     setError(null);
     setResult(null);
     setStatus(null);
@@ -106,7 +120,7 @@ export function useImageGeneration(): UseImageGenerationResult {
       if (requestTokenRef.current !== requestToken) {
         return;
       }
-      clearPollTimer();
+      finishGeneration();
       setPhase("failed");
       setError(caught instanceof Error ? caught.message : "Image generation failed");
     }
@@ -115,9 +129,10 @@ export function useImageGeneration(): UseImageGenerationResult {
   useEffect(() => {
     return () => {
       requestTokenRef.current += 1;
+      isGeneratingRef.current = false;
       clearPollTimer();
     };
   }, []);
 
-  return { phase, isGenerating: phase === "generating", result, status, error, submit };
+  return { phase, isGenerating: phase === "generating", activeRequest, result, status, error, submit };
 }

@@ -1,4 +1,4 @@
-export type ImageGenerationStatusValue = "running" | "completed" | "failed";
+export type ImageGenerationStatusValue = "pending" | "running" | "completed" | "failed";
 
 export interface GenerateImageRequest {
   prompt: string;

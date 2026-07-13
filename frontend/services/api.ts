@@ -17,6 +17,18 @@ async function requestJson<TResponse>(path: string, init: RequestInit): Promise<
   return (await response.json()) as TResponse;
 }
 
+export function resolveApiAssetUrl(path: string | null): string | null {
+  if (!path) {
+    return null;
+  }
+
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 export function generateImage(payload: GenerateImageRequest): Promise<GenerateImageResponse> {
   return requestJson<GenerateImageResponse>("/api/v1/images/generate", {
     method: "POST",

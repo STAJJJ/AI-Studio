@@ -53,6 +53,35 @@ def test_image_service_uses_default_dimensions(tmp_path: Path) -> None:
     assert client.submitted_workflow["latent"]["inputs"] == {"width": 1024, "height": 1024}
 
 
+def test_image_service_uses_unique_seed_and_filename_prefix_for_each_submission(tmp_path: Path) -> None:
+    template_path = tmp_path / "workflow.json"
+    template_path.write_text(
+        json.dumps(
+            {
+                "5": {"class_type": "KSampler", "inputs": {"seed": 20260710}},
+                "7": {"class_type": "SaveImage", "inputs": {"filename_prefix": "AIStudio_FLUX1_schnell_fp8"}},
+            }
+        )
+    )
+    client = FakeComfyUIClient()
+    service = ImageService(client=client, workflow_template_path=template_path)
+
+    service.generate_image(ImageGenerationRequest(prompt="A portrait"))
+    first_seed = client.submitted_workflow["5"]["inputs"]["seed"]
+    first_prefix = client.submitted_workflow["7"]["inputs"]["filename_prefix"]
+
+    service.generate_image(ImageGenerationRequest(prompt="A portrait"))
+    second_seed = client.submitted_workflow["5"]["inputs"]["seed"]
+    second_prefix = client.submitted_workflow["7"]["inputs"]["filename_prefix"]
+
+    assert isinstance(first_seed, int)
+    assert isinstance(second_seed, int)
+    assert first_seed != second_seed
+    assert first_prefix.startswith("AIStudio_FLUX1_schnell_fp8_")
+    assert second_prefix.startswith("AIStudio_FLUX1_schnell_fp8_")
+    assert first_prefix != second_prefix
+
+
 def test_image_service_returns_running_when_history_is_not_ready(tmp_path: Path) -> None:
     template_path = tmp_path / "workflow.json"
     template_path.write_text(json.dumps({}))
