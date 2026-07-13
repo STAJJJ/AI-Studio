@@ -6,6 +6,7 @@ import { ArrowLeft, Download, RefreshCw, Shuffle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFaceSwap } from "@/hooks/use-face-swap";
 import { resolveApiAssetUrl } from "@/services/api";
@@ -98,7 +99,7 @@ export function FaceSwapPanel() {
         </Button>
       </header>
 
-      <section className="grid flex-1 gap-6 lg:grid-cols-[420px_1fr]">
+      <section className="grid flex-1 gap-6 lg:grid-cols-[480px_1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Inputs</CardTitle>
@@ -106,20 +107,24 @@ export function FaceSwapPanel() {
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSubmit}>
-              <ImagePicker
-                id="source-face"
-                label="Source Face"
-                file={source.file}
-                previewUrl={source.url}
-                onChange={(event) => updatePreview("source", event)}
-              />
-              <ImagePicker
-                id="target-image"
-                label="Target Image"
-                file={target.file}
-                previewUrl={target.url}
-                onChange={(event) => updatePreview("target", event)}
-              />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <ImagePicker
+                  id="source-face"
+                  label="Source Face"
+                  description="Face identity"
+                  file={source.file}
+                  previewUrl={source.url}
+                  onChange={(event) => updatePreview("source", event)}
+                />
+                <ImagePicker
+                  id="target-image"
+                  label="Target Image"
+                  description="Portrait to transform"
+                  file={target.file}
+                  previewUrl={target.url}
+                  onChange={(event) => updatePreview("target", event)}
+                />
+              </div>
 
               <Button className="w-full" disabled={!canSubmit} type="submit">
                 <Shuffle className="h-4 w-4" aria-hidden="true" />
@@ -222,27 +227,31 @@ export function FaceSwapPanel() {
 interface ImagePickerProps {
   id: string;
   label: string;
+  description: string;
   file: File | null;
   previewUrl: string | null;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }
 
-function ImagePicker({ id, label, file, previewUrl, onChange }: ImagePickerProps) {
+function ImagePicker({ id, label, description, file, previewUrl, onChange }: ImagePickerProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <input
+    <div className="rounded-lg border bg-background p-4 shadow-sm">
+      <div className="space-y-1">
+        <Label htmlFor={id}>{label}</Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="mt-3 flex aspect-[4/5] items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+        {previewUrl ? <img className="h-full w-full object-contain" src={previewUrl} alt={`${label} preview`} /> : null}
+        {!previewUrl ? <p className="px-3 text-center text-sm text-muted-foreground">No image selected</p> : null}
+      </div>
+      <Input
         id={id}
         type="file"
         accept="image/png,image/jpeg,image/webp"
         onChange={onChange}
-        className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-3 h-auto cursor-pointer py-2 file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground"
       />
-      <div className="flex min-h-44 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-        {previewUrl ? <img className="h-auto max-h-64 w-full object-contain" src={previewUrl} alt={`${label} preview`} /> : null}
-        {!previewUrl ? <p className="text-sm text-muted-foreground">No image selected</p> : null}
-      </div>
-      {file ? <p className="truncate text-xs text-muted-foreground">{file.name}</p> : null}
+      {file ? <p className="mt-2 truncate text-xs text-muted-foreground">{file.name}</p> : null}
     </div>
   );
 }
