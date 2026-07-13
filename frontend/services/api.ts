@@ -1,4 +1,4 @@
-import type { GenerateImageRequest, GenerateImageResponse } from "@/types/image";
+import type { GenerateImageRequest, GenerateImageResponse, ImageGenerationStatusResponse } from "@/types/image";
 
 async function requestJson<TResponse>(path: string, init: RequestInit): Promise<TResponse> {
   const response = await fetch(path, {
@@ -21,5 +21,11 @@ export function generateImage(payload: GenerateImageRequest): Promise<GenerateIm
   return requestJson<GenerateImageResponse>("/api/v1/images/generate", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function getImageGenerationStatus(taskId: string): Promise<ImageGenerationStatusResponse> {
+  return requestJson<ImageGenerationStatusResponse>(`/api/v1/images/tasks/${encodeURIComponent(taskId)}`, {
+    method: "GET",
   });
 }

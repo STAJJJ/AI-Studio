@@ -1,3 +1,5 @@
+export type ImageGenerationStatusValue = "running" | "completed" | "failed";
+
 export interface GenerateImageRequest {
   prompt: string;
   width: number;
@@ -6,5 +8,12 @@ export interface GenerateImageRequest {
 
 export interface GenerateImageResponse {
   task_id: string;
-  status: "running" | string;
+  status: ImageGenerationStatusValue | string;
+}
+
+export interface ImageGenerationStatusResponse {
+  task_id: string;
+  status: ImageGenerationStatusValue;
+  progress: number;
+  image_url: string | null;
 }

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +18,14 @@ export function ImageGenerationPanel() {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
-  const { isGenerating, result, error, submit } = useImageGeneration();
+  const { phase, isGenerating, result, status, error, submit } = useImageGeneration();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submit({ prompt, width, height });
   }
+
+  const imageUrl = status?.status === "completed" ? status.image_url : null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-8">
@@ -98,29 +100,57 @@ export function ImageGenerationPanel() {
         <Card className="min-h-[480px]">
           <CardHeader>
             <CardTitle>Result</CardTitle>
-            <CardDescription>Task response from FastAPI.</CardDescription>
+            <CardDescription>Task response and generated image.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex min-h-80 items-center justify-center rounded-lg border border-dashed bg-muted/40 p-6">
-              {result ? (
-                <div className="w-full max-w-xl rounded-lg border bg-card p-5">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Task ID</p>
-                      <p className="mt-1 break-all font-mono text-sm">{result.task_id}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <p className="mt-1 text-sm font-medium capitalize text-secondary">{result.status}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : error ? (
+              {phase === "idle" ? (
+                <p className="text-center text-sm text-muted-foreground">Generated task details will appear here.</p>
+              ) : phase === "failed" ? (
                 <div className="w-full max-w-xl rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
-                  {error}
+                  {error ?? "Image generation failed."}
                 </div>
               ) : (
-                <p className="text-center text-sm text-muted-foreground">Generated task details will appear here.</p>
+                <div className="w-full max-w-2xl rounded-lg border bg-card p-5">
+                  <div className="space-y-4">
+                    {result ? (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Task ID</p>
+                        <p className="mt-1 break-all font-mono text-sm">{result.task_id}</p>
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Status</p>
+                        <p className="mt-1 text-sm font-medium capitalize text-secondary">{phase}</p>
+                      </div>
+                      {status ? (
+                        <p className="text-sm text-muted-foreground">Progress {status.progress}%</p>
+                      ) : null}
+                    </div>
+
+                    {phase === "generating" ? (
+                      <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        Waiting for ComfyUI result
+                      </div>
+                    ) : null}
+
+                    {imageUrl ? (
+                      <div className="space-y-4">
+                        <div className="overflow-hidden rounded-md border bg-background">
+                          <img className="h-auto w-full" src={imageUrl} alt="Generated image" />
+                        </div>
+                        <Button asChild variant="outline">
+                          <a href={imageUrl} download>
+                            <Download className="h-4 w-4" aria-hidden="true" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               )}
             </div>
           </CardContent>
