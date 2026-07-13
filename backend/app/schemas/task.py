@@ -16,6 +16,7 @@ class TaskStatus(str, Enum):
 class TaskResult(BaseModel):
     file_id: str
     download_url: str
+    image_url: str | None = None
 
 
 class TaskError(BaseModel):
@@ -38,6 +39,7 @@ class TaskRecord(BaseModel):
 
 class TaskResponse(BaseModel):
     id: str
+    task_id: str
     type: str
     status: TaskStatus
     progress: int
@@ -51,6 +53,7 @@ class TaskResponse(BaseModel):
     def from_record(cls, record: TaskRecord) -> "TaskResponse":
         return cls(
             id=record.id,
+            task_id=record.id,
             type=record.type,
             status=record.status,
             progress=record.progress,

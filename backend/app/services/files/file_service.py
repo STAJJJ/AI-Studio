@@ -33,6 +33,10 @@ class FileService:
         self._metadata_dir = self._upload_dir / ".metadata"
         self._ensure_directories()
 
+    @property
+    def output_dir(self) -> Path:
+        return self._output_dir
+
     def upload_file(self, upload_file: UploadFile, purpose: FilePurpose) -> FileMetadata:
         content_type = upload_file.content_type or "application/octet-stream"
         if content_type not in self._settings.allowed_mime_types:
@@ -72,6 +76,25 @@ class FileService:
             purpose=FilePurpose.output,
             size_bytes=destination.stat().st_size,
             path=destination,
+        )
+        self._save_metadata(metadata)
+        return metadata
+
+    def register_task_output_file(self, task_id: str, output_path: Path, content_type: str = "image/png") -> FileMetadata:
+        if not output_path.exists():
+            raise FileNotFoundError(f"Output source does not exist: {output_path}")
+        output_root = self._output_dir.resolve()
+        resolved_output = output_path.resolve()
+        if output_root not in resolved_output.parents:
+            raise FileServiceError("Output file must be stored under the configured output directory")
+
+        metadata = FileMetadata(
+            id=f"file_{uuid4().hex}",
+            filename=output_path.name,
+            content_type=content_type,
+            purpose=FilePurpose.output,
+            size_bytes=output_path.stat().st_size,
+            path=output_path,
         )
         self._save_metadata(metadata)
         return metadata

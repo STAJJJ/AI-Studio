@@ -1,5 +1,6 @@
 from threading import Lock
 from time import time
+from typing import Any
 
 from app.schemas.task import TaskError, TaskRecord, TaskResult, TaskStatus
 
@@ -34,12 +35,13 @@ class TaskManager:
         return self._update(task_id, status=TaskStatus.running, progress=10, message=message)
 
     def mark_succeeded(self, task_id: str, result_file_id: str) -> TaskRecord:
+        download_url = f"/api/v1/tasks/{task_id}/result"
         return self._update(
             task_id,
             status=TaskStatus.succeeded,
             progress=100,
             message="Completed",
-            result=TaskResult(file_id=result_file_id, download_url=f"/api/v1/tasks/{task_id}/result"),
+            result=TaskResult(file_id=result_file_id, download_url=download_url, image_url=download_url),
             error=None,
         )
 
@@ -51,6 +53,10 @@ class TaskManager:
             message="Failed",
             error=TaskError(code=code, message=message),
         )
+
+    def merge_payload(self, task_id: str, values: dict[str, Any]) -> TaskRecord:
+        task = self.get_task(task_id)
+        return self._update(task_id, payload={**task.payload, **values})
 
     def require_result(self, task_id: str) -> TaskRecord:
         task = self.get_task(task_id)

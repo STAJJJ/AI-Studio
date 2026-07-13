@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
-from app.schemas.task import FaceSwapTaskCreateRequest, TaskResponse
+from app.schemas.task import FaceSwapTaskCreateRequest, TaskResponse, TaskStatus
 from app.services.face_swap_service import face_swap_service
 from app.services.files.file_service import FileNotFoundError, file_service
 from app.services.jobs.task_manager import TaskNotFoundError, TaskResultNotReadyError, task_manager
@@ -28,10 +28,18 @@ def get_task(task_id: str) -> TaskResponse:
 @router.get("/tasks/{task_id}/result")
 def get_task_result(task_id: str) -> FileResponse:
     try:
+        task = task_manager.get_task(task_id)
+        if task.type != "face_swap":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Task result is not a face_swap image")
+        if task.status == TaskStatus.failed:
+            message = task.error.message if task.error else "Face swap task failed"
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
         task = task_manager.require_result(task_id)
         assert task.result is not None
         metadata = file_service.get_file(task.result.file_id)
         return FileResponse(path=metadata.path, media_type=metadata.content_type, filename=metadata.filename)
+    except HTTPException:
+        raise
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TaskResultNotReadyError as exc:

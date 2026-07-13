@@ -63,17 +63,17 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card className="opacity-70">
+          <Card className="transition-colors hover:border-secondary/70">
             <CardHeader>
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-secondary/10 text-secondary">
                 <Shuffle className="h-5 w-5" aria-hidden="true" />
               </div>
               <CardTitle>Face Swap</CardTitle>
-              <CardDescription>Coming Soon</CardDescription>
+              <CardDescription>Swap a source face into a target image through the FaceFusion gateway.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button disabled variant="secondary">
-                Coming Soon
+              <Button asChild variant="secondary">
+                <Link href="/face-swap">Open</Link>
               </Button>
             </CardContent>
           </Card>

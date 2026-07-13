@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     output_dir: Path = Field(default=PROJECT_ROOT / "data" / "outputs")
     mock_executor_delay_seconds: float = 2.0
 
+    facefusion_project_path: Path = Field(default=Path("/3241903007/workstation/LYJ/FaceFusion/facefusion"))
+    facefusion_python_path: str = Field(default="/opt/conda/envs/df/bin/python")
+    facefusion_execution_provider: str = Field(default="cpu")
+    facefusion_device_id: int = Field(default=0)
+    facefusion_timeout_seconds: int = Field(default=300)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

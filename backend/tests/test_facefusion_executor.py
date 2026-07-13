@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core.config import get_settings
 from app.executors.facefusion_executor import FaceFusionExecutor
 
 
@@ -11,7 +12,8 @@ def test_facefusion_executor_runs_headless_cli() -> None:
     if os.getenv("RUN_FACEFUSION_TEST") != "1":
         pytest.skip("Set RUN_FACEFUSION_TEST=1 to run FaceFusion CLI integration test")
 
-    facefusion_root = Path("/3241903007/workstation/LYJ/FaceFusion/facefusion")
+    settings = get_settings()
+    facefusion_root = settings.facefusion_project_path
     if not (facefusion_root / "facefusion.py").exists():
         pytest.skip("FaceFusion CLI is not installed on this server yet")
 
@@ -22,10 +24,10 @@ def test_facefusion_executor_runs_headless_cli() -> None:
 
     executor = FaceFusionExecutor(
         facefusion_root=facefusion_root,
-        python_executable="python",
-        timeout_seconds=300,
-        execution_provider="cpu",
-        execution_device_ids=[0],
+        python_executable=settings.facefusion_python_path,
+        timeout_seconds=settings.facefusion_timeout_seconds,
+        execution_provider=settings.facefusion_execution_provider,
+        execution_device_ids=[settings.facefusion_device_id],
     )
 
     result = executor.execute(
