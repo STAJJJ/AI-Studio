@@ -1,4 +1,3 @@
-import os
 import uuid
 from pathlib import Path
 from typing import Any, Literal
@@ -6,16 +5,12 @@ from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.services.comfyui.client import ComfyUIClient
+from app.services.comfyui.model_registry import ImageModelRegistry
 from app.services.comfyui.workflow import ComfyUIWorkflowTemplate
 
 
-DEFAULT_WORKFLOW_TEMPLATE = (
-    Path(__file__).resolve().parent
-    / "comfyui"
-    / "templates"
-    / "flux1_schnell_fp8_text_to_image.json"
-)
 DEFAULT_COMFYUI_OUTPUT_DIR = Path("/3241903007/workstation/LYJ/ComfyUI/output")
 
 ImageTaskStatus = Literal["pending", "running", "completed", "failed"]
@@ -31,8 +26,9 @@ class InvalidImageResultError(ValueError):
 
 class ImageGenerationRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=4000)
-    width: int = Field(default=1024, ge=64, le=2048)
-    height: int = Field(default=1024, ge=64, le=2048)
+    model: str | None = None
+    width: int | None = Field(default=None, ge=64, le=2048)
+    height: int | None = Field(default=None, ge=64, le=2048)
 
 
 class ImageGenerationResponse(BaseModel):
@@ -51,18 +47,21 @@ class ImageService:
     def __init__(
         self,
         client: ComfyUIClient,
-        workflow_template_path: Path = DEFAULT_WORKFLOW_TEMPLATE,
+        model_registry: ImageModelRegistry | None = None,
         output_dir: Path = DEFAULT_COMFYUI_OUTPUT_DIR,
     ) -> None:
         self._client = client
-        self._workflow_template = ComfyUIWorkflowTemplate(workflow_template_path)
+        self._model_registry = model_registry or ImageModelRegistry()
         self._output_dir = output_dir
 
     def generate_image(self, request: ImageGenerationRequest) -> ImageGenerationResponse:
-        workflow = self._workflow_template.render(
+        model = self._model_registry.get_model(request.model)
+        workflow_template = ComfyUIWorkflowTemplate(self._model_registry.get_workflow_path(model.id))
+        workflow = workflow_template.render(
             prompt=request.prompt,
-            width=request.width,
-            height=request.height,
+            width=request.width or model.width,
+            height=request.height or model.height,
+            checkpoint=model.checkpoint,
         )
         self._prepare_unique_workflow_run(workflow)
         prompt_id = self._client.submit_workflow(workflow)
@@ -147,13 +146,21 @@ class ImageService:
 
 
 def _build_default_client() -> ComfyUIClient:
-    base_url = os.getenv("AI_STUDIO_COMFYUI_BASE_URL", "http://127.0.0.1:8188")
-    timeout_seconds = int(os.getenv("AI_STUDIO_COMFYUI_TIMEOUT_SECONDS", "30"))
-    return ComfyUIClient(base_url=base_url, timeout_seconds=timeout_seconds)
+    settings = get_settings()
+    return ComfyUIClient(base_url=settings.comfyui_base_url, timeout_seconds=settings.comfyui_timeout_seconds)
 
 
 def _build_default_output_dir() -> Path:
-    return Path(os.getenv("AI_STUDIO_COMFYUI_OUTPUT_DIR", str(DEFAULT_COMFYUI_OUTPUT_DIR)))
+    return get_settings().comfyui_output_dir
 
 
-image_service = ImageService(client=_build_default_client(), output_dir=_build_default_output_dir())
+def _build_default_model_registry() -> ImageModelRegistry:
+    settings = get_settings()
+    return ImageModelRegistry(default_model_id=settings.default_image_model)
+
+
+image_service = ImageService(
+    client=_build_default_client(),
+    model_registry=_build_default_model_registry(),
+    output_dir=_build_default_output_dir(),
+)

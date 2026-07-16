@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, RefreshCw, Sparkles } from "lucide-react";
 
@@ -10,17 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useImageGeneration } from "@/hooks/use-image-generation";
-import { resolveApiAssetUrl } from "@/services/api";
-import type { GenerateImageRequest } from "@/types/image";
+import { getRuntime, resolveApiAssetUrl } from "@/services/api";
+import type { GenerateImageRequest, RuntimeModel } from "@/types/image";
 
-const currentModel = "FLUX.1 Schnell FP8";
+const fallbackModels: RuntimeModel[] = [
+  { id: "sd15", name: "Stable Diffusion 1.5", width: 512, height: 512 },
+  { id: "flux", name: "FLUX.1 Schnell FP8", width: 1024, height: 1024 },
+];
 const defaultPrompt =
   "A cinematic portrait of a young man in a modern studio, realistic photography, soft lighting, detailed face";
 
 const statusCopy = {
   idle: {
     title: "Ready to generate",
-    description: "Enter a prompt and submit a FLUX image task through the AI Studio gateway.",
+    description: "Enter a prompt and submit an image task through the AI Studio gateway.",
   },
   generating: {
     title: "Generating image",
@@ -45,11 +48,17 @@ function formatDimensions(request: GenerateImageRequest | null): string {
 }
 
 export function ImageGenerationPanel() {
+  const [models, setModels] = useState<RuntimeModel[]>(fallbackModels);
+  const [selectedModelId, setSelectedModelId] = useState("sd15");
   const [prompt, setPrompt] = useState(defaultPrompt);
-  const [width, setWidth] = useState(1024);
-  const [height, setHeight] = useState(1024);
+  const [width, setWidth] = useState(512);
+  const [height, setHeight] = useState(512);
   const { phase, isGenerating, activeRequest, result, status, error, submit } = useImageGeneration();
 
+  const selectedModel = useMemo(
+    () => models.find((model) => model.id === selectedModelId) ?? fallbackModels[0],
+    [models, selectedModelId],
+  );
   const imageUrl = useMemo(
     () => resolveApiAssetUrl(status?.status === "completed" ? status.image_url : null),
     [status],
@@ -59,13 +68,47 @@ export function ImageGenerationPanel() {
   const canSubmit = !isGenerating && prompt.trim().length > 0;
   const submittedPrompt = activeRequest?.prompt ?? prompt;
 
+  useEffect(() => {
+    let isActive = true;
+    void getRuntime()
+      .then((runtime) => {
+        if (!isActive) {
+          return;
+        }
+        setModels(runtime.models);
+        setSelectedModelId(runtime.current_model_id);
+        const currentModel = runtime.models.find((model) => model.id === runtime.current_model_id);
+        if (currentModel) {
+          setWidth(currentModel.width);
+          setHeight(currentModel.height);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setModels(fallbackModels);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  function handleModelChange(modelId: string) {
+    setSelectedModelId(modelId);
+    const nextModel = models.find((model) => model.id === modelId);
+    if (nextModel) {
+      setWidth(nextModel.width);
+      setHeight(nextModel.height);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) {
       return;
     }
 
-    await submit({ prompt: prompt.trim(), width, height });
+    await submit({ prompt: prompt.trim(), model: selectedModelId, width, height });
   }
 
   async function handleGenerateAgain() {
@@ -73,11 +116,11 @@ export function ImageGenerationPanel() {
       return;
     }
 
-    await submit({ prompt: prompt.trim(), width, height });
+    await submit({ prompt: prompt.trim(), model: selectedModelId, width, height });
   }
 
   async function handleRetry() {
-    const retryRequest = activeRequest ?? { prompt: prompt.trim(), width, height };
+    const retryRequest = activeRequest ?? { prompt: prompt.trim(), model: selectedModelId, width, height };
     if (isGenerating || retryRequest.prompt.trim().length === 0) {
       return;
     }
@@ -91,7 +134,7 @@ export function ImageGenerationPanel() {
         <div className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">Text to Image</p>
           <h1 className="text-3xl font-semibold tracking-normal">Generate Image</h1>
-          <p className="text-sm text-muted-foreground">Current Model: {currentModel}</p>
+          <p className="text-sm text-muted-foreground">Current Model: {selectedModel.name}</p>
         </div>
         <Button asChild variant="outline">
           <Link href="/">
@@ -105,13 +148,25 @@ export function ImageGenerationPanel() {
         <Card>
           <CardHeader>
             <CardTitle>Prompt</CardTitle>
-            <CardDescription>Submit one ComfyUI FLUX task at a time through FastAPI.</CardDescription>
+            <CardDescription>Submit one ComfyUI image task at a time through FastAPI.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSubmit}>
-              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Model</span>
-                <span className="ml-2 font-medium text-foreground">{currentModel}</span>
+              <div className="space-y-2">
+                <Label htmlFor="model">Model</Label>
+                <select
+                  id="model"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isGenerating}
+                  value={selectedModelId}
+                  onChange={(event) => handleModelChange(event.target.value)}
+                >
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -191,7 +246,7 @@ export function ImageGenerationPanel() {
                 <div className="w-full space-y-5 rounded-lg border bg-card p-5">
                   <TaskMeta taskId={taskId} status={status?.status ?? "running"} progress={progress} />
                   <div className="rounded-md bg-muted px-3 py-3 text-sm text-muted-foreground">
-                    Waiting for ComfyUI to finish the FLUX inference. Polling will stop automatically when the task
+                    Waiting for ComfyUI to finish inference. Polling will stop automatically when the task
                     completes or fails.
                   </div>
                 </div>

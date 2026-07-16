@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     facefusion_device_id: int = Field(default=0)
     facefusion_timeout_seconds: int = Field(default=300)
 
+    default_image_model: str = Field(default="sd15")
+    runtime_gpu_name: str = Field(default="Apple Silicon MPS")
+    comfyui_base_url: str = Field(default="http://127.0.0.1:8188")
+    comfyui_timeout_seconds: int = Field(default=120)
+    comfyui_output_dir: Path = Field(default=Path("/Users/lyj/WorkStation/Project/ComfyUI/output"))
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -1,17 +1,55 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Images, Shuffle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRuntime } from "@/services/api";
+import type { RuntimeResponse } from "@/types/image";
 
-const runtimeStatus = [
-  ["Current Model", "FLUX.1 Schnell FP8"],
-  ["Engine", "ComfyUI"],
-  ["Backend", "FastAPI"],
-  ["GPU", "RTX 4090 D"],
-] as const;
+const fallbackRuntime: RuntimeResponse = {
+  current_model: "Stable Diffusion 1.5",
+  current_model_id: "sd15",
+  engine: "ComfyUI",
+  backend: "FastAPI",
+  gpu: "Apple Silicon MPS",
+  status: "Ready",
+  models: [
+    { id: "sd15", name: "Stable Diffusion 1.5", width: 512, height: 512 },
+    { id: "flux", name: "FLUX.1 Schnell FP8", width: 1024, height: 1024 },
+  ],
+};
 
 export default function HomePage() {
+  const [runtime, setRuntime] = useState<RuntimeResponse>(fallbackRuntime);
+
+  useEffect(() => {
+    let isActive = true;
+    void getRuntime()
+      .then((response) => {
+        if (isActive) {
+          setRuntime(response);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setRuntime(fallbackRuntime);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const runtimeStatus = [
+    ["Current Model", runtime.current_model],
+    ["Engine", runtime.engine],
+    ["Backend", runtime.backend],
+    ["GPU", runtime.gpu],
+  ] as const;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-10">
       <section className="flex flex-1 flex-col justify-center gap-8">
@@ -28,10 +66,10 @@ export default function HomePage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-lg">Runtime</CardTitle>
-                <CardDescription>Static demo environment for the current image generation workflow.</CardDescription>
+                <CardDescription>Current demo environment reported by the FastAPI runtime.</CardDescription>
               </div>
               <span className="rounded-md border border-secondary/30 bg-secondary/10 px-3 py-1 text-sm font-medium text-secondary">
-                Ready
+                {runtime.status}
               </span>
             </div>
           </CardHeader>

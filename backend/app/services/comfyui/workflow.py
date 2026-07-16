@@ -12,13 +12,15 @@ class ComfyUIWorkflowTemplate:
     def __init__(self, template_path: Path) -> None:
         self._template_path = template_path
 
-    def render(self, prompt: str, width: int, height: int) -> dict[str, Any]:
+    def render(self, prompt: str, width: int, height: int, checkpoint: str | None = None) -> dict[str, Any]:
         template = self._load_template()
         replacements = {
             "{{prompt}}": prompt,
             "{{width}}": width,
             "{{height}}": height,
         }
+        if checkpoint is not None:
+            replacements["{{checkpoint}}"] = checkpoint
         rendered = self._replace_placeholders(template, replacements)
         if not isinstance(rendered, dict):
             raise WorkflowTemplateError("ComfyUI workflow template root must be an object")

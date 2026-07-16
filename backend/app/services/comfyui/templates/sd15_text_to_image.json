@@ -8,15 +8,21 @@
   "2": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["1", 1],
+      "clip": [
+        "1",
+        1
+      ],
       "text": "{{prompt}}"
     }
   },
   "3": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["1", 1],
-      "text": ""
+      "clip": [
+        "1",
+        1
+      ],
+      "text": "blurry, low quality, distorted"
     }
   },
   "4": {
@@ -30,30 +36,51 @@
   "5": {
     "class_type": "KSampler",
     "inputs": {
-      "model": ["1", 0],
+      "model": [
+        "1",
+        0
+      ],
       "seed": 20260710,
-      "steps": 4,
-      "cfg": 1.0,
+      "steps": 8,
+      "cfg": 7.0,
       "sampler_name": "euler",
-      "scheduler": "simple",
-      "positive": ["2", 0],
-      "negative": ["3", 0],
-      "latent_image": ["4", 0],
+      "scheduler": "normal",
+      "positive": [
+        "2",
+        0
+      ],
+      "negative": [
+        "3",
+        0
+      ],
+      "latent_image": [
+        "4",
+        0
+      ],
       "denoise": 1.0
     }
   },
   "6": {
     "class_type": "VAEDecode",
     "inputs": {
-      "samples": ["5", 0],
-      "vae": ["1", 2]
+      "samples": [
+        "5",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
     }
   },
   "7": {
     "class_type": "SaveImage",
     "inputs": {
-      "filename_prefix": "AIStudio_FLUX1_schnell_fp8",
-      "images": ["6", 0]
+      "filename_prefix": "AIStudio_SD15",
+      "images": [
+        "6",
+        0
+      ]
     }
   }
 }

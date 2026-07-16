@@ -2,6 +2,7 @@ export type ImageGenerationStatusValue = "pending" | "running" | "completed" | "
 
 export interface GenerateImageRequest {
   prompt: string;
+  model?: string;
   width: number;
   height: number;
 }
@@ -16,4 +17,21 @@ export interface ImageGenerationStatusResponse {
   status: ImageGenerationStatusValue;
   progress: number;
   image_url: string | null;
+}
+
+export interface RuntimeModel {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+}
+
+export interface RuntimeResponse {
+  current_model: string;
+  current_model_id: string;
+  engine: string;
+  backend: string;
+  gpu: string;
+  status: string;
+  models: RuntimeModel[];
 }

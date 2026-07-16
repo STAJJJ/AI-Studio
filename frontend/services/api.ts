@@ -1,5 +1,10 @@
 import type { FaceSwapTaskResponse, FilePurpose, FileUploadResponse } from "@/types/face-swap";
-import type { GenerateImageRequest, GenerateImageResponse, ImageGenerationStatusResponse } from "@/types/image";
+import type {
+  GenerateImageRequest,
+  GenerateImageResponse,
+  ImageGenerationStatusResponse,
+  RuntimeResponse,
+} from "@/types/image";
 
 async function requestJson<TResponse>(path: string, init: RequestInit): Promise<TResponse> {
   const response = await fetch(path, {
@@ -53,6 +58,12 @@ export function generateImage(payload: GenerateImageRequest): Promise<GenerateIm
 
 export function getImageGenerationStatus(taskId: string): Promise<ImageGenerationStatusResponse> {
   return requestJson<ImageGenerationStatusResponse>(`/api/v1/images/tasks/${encodeURIComponent(taskId)}`, {
+    method: "GET",
+  });
+}
+
+export function getRuntime(): Promise<RuntimeResponse> {
+  return requestJson<RuntimeResponse>("/api/v1/runtime", {
     method: "GET",
   });
 }

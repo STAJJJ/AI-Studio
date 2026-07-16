@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.endpoints import images
 from app.main import app
+from app.services.comfyui.model_registry import UnknownImageModelError
 from app.services.image_service import ImageGenerationResponse, ImageGenerationStatus
 
 
@@ -18,6 +19,8 @@ class FakeImageService:
 
     def generate_image(self, request):
         self.request = request
+        if request.model == "unknown":
+            raise UnknownImageModelError("Unsupported image model: unknown")
         return ImageGenerationResponse(task_id="prompt-endpoint", status="running")
 
     def get_generation_status(self, task_id):
@@ -47,8 +50,38 @@ def test_generate_image_endpoint_delegates_to_image_service(monkeypatch) -> None
     assert response.status_code == 202
     assert response.json() == {"task_id": "prompt-endpoint", "status": "running"}
     assert fake_service.request.prompt == "A cinematic portrait"
+    assert fake_service.request.model is None
     assert fake_service.request.width == 1024
     assert fake_service.request.height == 1024
+
+
+def test_generate_image_endpoint_accepts_model(monkeypatch) -> None:
+    fake_service = FakeImageService()
+    monkeypatch.setattr(images, "image_service", fake_service)
+
+    response = client.post(
+        "/api/v1/images/generate",
+        json={"prompt": "A forest cabin", "model": "sd15"},
+    )
+
+    assert response.status_code == 202
+    assert fake_service.request.prompt == "A forest cabin"
+    assert fake_service.request.model == "sd15"
+    assert fake_service.request.width is None
+    assert fake_service.request.height is None
+
+
+def test_generate_image_endpoint_rejects_unknown_model(monkeypatch) -> None:
+    fake_service = FakeImageService()
+    monkeypatch.setattr(images, "image_service", fake_service)
+
+    response = client.post(
+        "/api/v1/images/generate",
+        json={"prompt": "A forest cabin", "model": "unknown"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported image model: unknown"
 
 
 def test_get_image_task_status_endpoint_delegates_to_image_service(monkeypatch) -> None:

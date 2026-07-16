@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
 from app.services.comfyui.client import ComfyUIClientError
+from app.services.comfyui.model_registry import UnknownImageModelError
 from app.services.comfyui.workflow import WorkflowTemplateError
 from app.services.image_service import (
     ImageGenerationRequest,
@@ -19,6 +20,8 @@ router = APIRouter(prefix="/images", tags=["Images"])
 def generate_image(request: ImageGenerationRequest) -> ImageGenerationResponse:
     try:
         return image_service.generate_image(request)
+    except UnknownImageModelError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except WorkflowTemplateError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
     except ComfyUIClientError as exc:
