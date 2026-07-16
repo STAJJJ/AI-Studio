@@ -19,6 +19,7 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+.history/
 
 # Runtime data
 data/uploads/*

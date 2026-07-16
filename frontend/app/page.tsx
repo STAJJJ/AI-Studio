@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Images, Shuffle } from "lucide-react";
+import { Images, MessageSquare, Shuffle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +85,22 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="transition-colors hover:border-primary/70">
+            <CardHeader>
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <MessageSquare className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <CardTitle>AI Chat</CardTitle>
+              <CardDescription>Chat with role-based assistants through the FastAPI LLM gateway.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/chat">Open</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="transition-colors hover:border-primary/70">
             <CardHeader>
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">

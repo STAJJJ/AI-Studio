@@ -1,4 +1,5 @@
 import type { FaceSwapTaskResponse, FilePurpose, FileUploadResponse } from "@/types/face-swap";
+import type { ChatCompletionRequest, ChatRolesResponse, ChatStreamEvent } from "@/types/chat";
 import type {
   GenerateImageRequest,
   GenerateImageResponse,
@@ -68,6 +69,63 @@ export function getRuntime(): Promise<RuntimeResponse> {
   });
 }
 
+export function getChatRoles(): Promise<ChatRolesResponse> {
+  return requestJson<ChatRolesResponse>("/api/v1/chat/roles", {
+    method: "GET",
+  });
+}
+
+export async function streamChatCompletion(
+  payload: ChatCompletionRequest,
+  options: {
+    signal: AbortSignal;
+    onDelta: (content: string) => void;
+  },
+): Promise<void> {
+  const response = await fetch("/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(extractErrorMessage(message) || `Request failed with status ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error("Streaming response is not available");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const shouldStop = handleSseEvent(event, options.onDelta);
+      if (shouldStop) {
+        return;
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    handleSseEvent(buffer, options.onDelta);
+  }
+}
+
 export function uploadFile(file: File, purpose: FilePurpose): Promise<FileUploadResponse> {
   const formData = new FormData();
   formData.append("purpose", purpose);
@@ -86,4 +144,40 @@ export function getTask(taskId: string): Promise<FaceSwapTaskResponse> {
   return requestJson<FaceSwapTaskResponse>(`/api/v1/tasks/${encodeURIComponent(taskId)}`, {
     method: "GET",
   });
+}
+
+function handleSseEvent(rawEvent: string, onDelta: (content: string) => void): boolean {
+  const dataLines = rawEvent
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trim());
+
+  for (const data of dataLines) {
+    if (data === "[DONE]") {
+      return true;
+    }
+
+    const event = JSON.parse(data) as ChatStreamEvent;
+    if (event.type === "delta") {
+      onDelta(event.content);
+    }
+    if (event.type === "error") {
+      throw new Error(event.message);
+    }
+    if (event.type === "done") {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function extractErrorMessage(message: string): string {
+  try {
+    const payload = JSON.parse(message) as { detail?: string };
+    return payload.detail ?? message;
+  } catch {
+    return message;
+  }
 }

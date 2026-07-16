@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     comfyui_timeout_seconds: int = Field(default=120)
     comfyui_output_dir: Path = Field(default=Path("/Users/lyj/WorkStation/Project/ComfyUI/output"))
 
+    llm_base_url: str = Field(default="https://ark.cn-beijing.volces.com/api/v3")
+    llm_api_key: str = Field(default="")
+    llm_default_model: str = Field(default="deepseek")
+    llm_timeout_seconds: int = Field(default=60)
+    llm_max_context_messages: int = Field(default=20)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

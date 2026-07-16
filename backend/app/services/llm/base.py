@@ -4,6 +4,30 @@ from collections.abc import Iterator
 from app.schemas.chat import ChatCompletionRequest, ChatCompletionResponse, ModelInfo
 
 
+class LLMProviderError(RuntimeError):
+    status_code = 502
+
+
+class LLMConfigurationError(LLMProviderError):
+    status_code = 500
+
+
+class LLMAuthenticationError(LLMProviderError):
+    status_code = 401
+
+
+class LLMRateLimitError(LLMProviderError):
+    status_code = 429
+
+
+class LLMTimeoutError(LLMProviderError):
+    status_code = 504
+
+
+class LLMUpstreamError(LLMProviderError):
+    status_code = 502
+
+
 class BaseLLMClient(ABC):
     model_id: str
     provider_name: str
