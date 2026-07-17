@@ -1,8 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
-import Link from "next/link";
-import { ArrowLeft, Bot, Eraser, MessageSquare, Plus, Send, Square } from "lucide-react";
+import { Bot, Eraser, MessageSquare, Plus, Send, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,19 +43,13 @@ export function ChatPanel() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
+      <header className="space-y-1">
         <div className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">AI Chat</p>
           <h1 className="text-3xl font-semibold tracking-normal">Chat with AI Studio</h1>
           <p className="text-sm text-muted-foreground">Streaming chat through FastAPI and the LLM Gateway.</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Home
-          </Link>
-        </Button>
       </header>
 
       <section className="grid flex-1 gap-6 lg:grid-cols-[360px_1fr]">

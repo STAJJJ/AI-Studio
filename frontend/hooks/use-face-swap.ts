@@ -80,6 +80,7 @@ export function useFaceSwap(): UseFaceSwapResult {
         finish();
         setPhase("completed");
         setError(null);
+        window.dispatchEvent(new Event("ai-studio:history-updated"));
         return;
       }
 

@@ -5,6 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { getWorkflowHistory, getWorkflowHistoryRun } from "@/services/api";
 import type { HistoryFilters, WorkflowHistoryListResponse, WorkflowRunDetail, WorkflowRunSummary } from "@/types/history";
 
+interface UseHistoryOptions {
+  limit?: number;
+  initialRunId?: string | null;
+}
+
 interface UseHistoryResult {
   filters: HistoryFilters;
   items: WorkflowRunSummary[];
@@ -21,13 +26,16 @@ interface UseHistoryResult {
 
 const defaultFilters: HistoryFilters = { workflowType: "all", status: "all" };
 
-export function useHistory(): UseHistoryResult {
+export function useHistory(options: UseHistoryOptions = {}): UseHistoryResult {
   const [filters, setFilters] = useState<HistoryFilters>(defaultFilters);
   const [data, setData] = useState<WorkflowHistoryListResponse | null>(null);
   const [selectedRun, setSelectedRun] = useState<WorkflowRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const limit = options.limit ?? 50;
+  const initialRunId = options.initialRunId ?? null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,7 +44,7 @@ export function useHistory(): UseHistoryResult {
       const response = await getWorkflowHistory({
         workflowType: filters.workflowType === "all" ? undefined : filters.workflowType,
         status: filters.status === "all" ? undefined : filters.status,
-        limit: 50,
+        limit,
         offset: 0,
       });
       setData(response);
@@ -48,9 +56,9 @@ export function useHistory(): UseHistoryResult {
     } finally {
       setLoading(false);
     }
-  }, [filters.status, filters.workflowType, selectedRun]);
+  }, [filters.status, filters.workflowType, limit, selectedRun]);
 
-  async function selectRun(runId: string) {
+  const selectRun = useCallback(async (runId: string) => {
     setDetailLoading(true);
     setError(null);
     try {
@@ -60,7 +68,7 @@ export function useHistory(): UseHistoryResult {
     } finally {
       setDetailLoading(false);
     }
-  }
+  }, []);
 
   function setWorkflowType(value: HistoryFilters["workflowType"]) {
     setFilters((current) => ({ ...current, workflowType: value }));
@@ -72,6 +80,22 @@ export function useHistory(): UseHistoryResult {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!initialRunId || selectedRun?.id === initialRunId) {
+      return;
+    }
+    void selectRun(initialRunId);
+  }, [initialRunId, selectRun, selectedRun?.id]);
+
+  useEffect(() => {
+    function handleHistoryUpdated() {
+      void load();
+    }
+
+    window.addEventListener("ai-studio:history-updated", handleHistoryUpdated);
+    return () => window.removeEventListener("ai-studio:history-updated", handleHistoryUpdated);
   }, [load]);
 
   return {

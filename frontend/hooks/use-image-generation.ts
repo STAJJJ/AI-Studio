@@ -66,6 +66,7 @@ export function useImageGeneration(): UseImageGenerationResult {
         if (nextStatus.image_url) {
           setPhase("completed");
           setError(null);
+          window.dispatchEvent(new Event("ai-studio:history-updated"));
         } else {
           setPhase("failed");
           setError("Image generation completed, but ComfyUI did not return an output image.");

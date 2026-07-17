@@ -1,8 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Download, RefreshCw, Sparkles } from "lucide-react";
+import { Download, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,19 +128,13 @@ export function ImageGenerationPanel() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
+      <header className="space-y-1">
         <div className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">Text to Image</p>
           <h1 className="text-3xl font-semibold tracking-normal">Generate Image</h1>
           <p className="text-sm text-muted-foreground">Current Model: {selectedModel.name}</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Home
-          </Link>
-        </Button>
       </header>
 
       <section className="grid flex-1 gap-6 lg:grid-cols-[420px_1fr]">

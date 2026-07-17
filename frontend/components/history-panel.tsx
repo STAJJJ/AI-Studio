@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft, Download, History, RefreshCw } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Download, History, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,9 @@ const workflowLabel: Record<WorkflowType, string> = {
 };
 
 export function HistoryPanel() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const runId = searchParams.get("run_id");
   const {
     filters,
     items,
@@ -50,11 +53,16 @@ export function HistoryPanel() {
     setStatus,
     selectRun,
     refresh,
-  } = useHistory();
+  } = useHistory({ initialRunId: runId });
   const resultUrl = resolveApiAssetUrl(selectedRun?.result_url ?? null);
 
+  function handleSelectRun(runId: string) {
+    router.push(`/history?run_id=${encodeURIComponent(runId)}`);
+    void selectRun(runId);
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-6 py-8">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm font-medium uppercase tracking-wide text-primary">Workflow History</p>
@@ -65,12 +73,6 @@ export function HistoryPanel() {
           <Button type="button" variant="outline" onClick={() => void refresh()}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Refresh
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/">
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Home
-            </Link>
           </Button>
         </div>
       </header>
@@ -137,7 +139,12 @@ export function HistoryPanel() {
 
             <div className="space-y-3">
               {items.map((item) => (
-                <HistoryListItem key={item.id} item={item} selected={selectedRun?.id === item.id} onSelect={() => void selectRun(item.id)} />
+                <HistoryListItem
+                  key={item.id}
+                  item={item}
+                  selected={selectedRun?.id === item.id}
+                  onSelect={() => handleSelectRun(item.id)}
+                />
               ))}
             </div>
           </CardContent>
