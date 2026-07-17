@@ -4,9 +4,12 @@ from typing import Protocol
 
 from app.core.config import Settings, get_settings
 from app.executors.facefusion_executor import ExecutionResult, FaceFusionExecutor
+from app.schemas.history import WorkflowRunStatus, WorkflowType
 from app.schemas.file import FileMetadata, FilePurpose
 from app.schemas.task import FaceSwapTaskCreateRequest, TaskRecord, TaskResponse
 from app.services.files.file_service import FileService, file_service
+from app.services.history.repository import WorkflowRunNotFoundError
+from app.services.history.service import WorkflowHistoryService, workflow_history_service
 from app.services.jobs.task_manager import TaskManager, task_manager
 
 
@@ -20,10 +23,17 @@ class FaceSwapExecutorProtocol(Protocol):
 
 
 class FaceSwapService:
-    def __init__(self, files: FileService, tasks: TaskManager, executor: FaceSwapExecutorProtocol) -> None:
+    def __init__(
+        self,
+        files: FileService,
+        tasks: TaskManager,
+        executor: FaceSwapExecutorProtocol,
+        history: WorkflowHistoryService | None = None,
+    ) -> None:
         self._files = files
         self._tasks = tasks
         self._executor = executor
+        self._history = history or workflow_history_service
 
     def create_task(self, request: FaceSwapTaskCreateRequest) -> TaskResponse:
         source, target = self._validate_input_files(request)
@@ -36,6 +46,11 @@ class FaceSwapService:
                 "target_path": str(target.path),
                 "options": request.options,
             },
+        )
+        self._history.create_face_swap_run(
+            external_task_id=task.id,
+            source_file_id=request.source_file_id,
+            target_file_id=request.target_file_id,
         )
         Thread(target=self._run_task, args=(task,), daemon=True).start()
         return TaskResponse.from_record(task)
@@ -70,8 +85,32 @@ class FaceSwapService:
                 },
             )
             self._tasks.mark_succeeded(task.id, result_file_id=metadata.id)
+            self._update_history_if_present(
+                task.id,
+                status=WorkflowRunStatus.succeeded,
+                progress=100,
+                result_file_id=metadata.id,
+                output_payload={
+                    "filename": metadata.filename,
+                    "content_type": metadata.content_type,
+                    "size_bytes": metadata.size_bytes,
+                },
+            )
         except Exception as exc:  # noqa: BLE001 - background task boundary must persist failures.
             self._tasks.mark_failed(task.id, code="FACEFUSION_EXECUTION_FAILED", message=str(exc))
+            self._update_history_if_present(
+                task.id,
+                status=WorkflowRunStatus.failed,
+                progress=100,
+                error_code="FACEFUSION_EXECUTION_FAILED",
+                error_message=str(exc),
+            )
+
+    def _update_history_if_present(self, task_id: str, **changes: object) -> None:
+        try:
+            self._history.update_by_external_task_id(WorkflowType.face_swap, task_id, **changes)
+        except WorkflowRunNotFoundError:
+            return
 
     def _validate_input_files(self, request: FaceSwapTaskCreateRequest) -> tuple[FileMetadata, FileMetadata]:
         source = self._files.get_file(request.source_file_id)

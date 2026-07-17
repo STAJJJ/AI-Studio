@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.executors.facefusion_executor import ExecutionResult
+from app.schemas.history import WorkflowRunStatus, WorkflowType
 from app.main import app
 from app.services.face_swap_service import face_swap_service
 from app.services.files.file_service import FileServiceError, file_service
@@ -205,3 +206,47 @@ def test_task_output_registration_rejects_path_outside_output_dir(tmp_path: Path
 
     with pytest.raises(FileServiceError):
         file_service.register_task_output_file("task_bad", outside_path)
+
+
+def test_face_swap_creates_and_updates_history_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_executor = FakeFaceFusionExecutor()
+    monkeypatch.setattr(face_swap_service, "_executor", fake_executor)
+    source_file_id = upload_test_file("source.png", "image/png", "source_face")
+    target_file_id = upload_test_file("target.png", "image/png", "target_image")
+
+    create_response = client.post(
+        "/api/v1/face-swap/tasks",
+        json={"source_file_id": source_file_id, "target_file_id": target_file_id},
+    )
+    assert create_response.status_code == 201
+    task_id = create_response.json()["task_id"]
+    final_payload = wait_for_terminal_task(task_id)
+
+    run = face_swap_service._history.get_by_external_task_id(WorkflowType.face_swap, task_id)
+    assert final_payload["status"] == "succeeded"
+    assert run.status == WorkflowRunStatus.succeeded
+    assert run.input_payload == {"source_file_id": source_file_id, "target_file_id": target_file_id}
+    assert run.result_file_id == final_payload["result"]["file_id"]
+    assert "/Users/" not in str(run.model_dump())
+    assert "/3241903007/" not in str(run.model_dump())
+
+
+def test_face_swap_updates_history_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(face_swap_service, "_executor", FakeFaceFusionExecutor(exit_code=1, write_output=False))
+    source_file_id = upload_test_file("source.png", "image/png", "source_face")
+    target_file_id = upload_test_file("target.png", "image/png", "target_image")
+
+    create_response = client.post(
+        "/api/v1/face-swap/tasks",
+        json={"source_file_id": source_file_id, "target_file_id": target_file_id},
+    )
+    assert create_response.status_code == 201
+    task_id = create_response.json()["task_id"]
+    final_payload = wait_for_terminal_task(task_id)
+
+    run = face_swap_service._history.get_by_external_task_id(WorkflowType.face_swap, task_id)
+    assert final_payload["status"] == "failed"
+    assert run.status == WorkflowRunStatus.failed
+    assert run.error_code == "FACEFUSION_EXECUTION_FAILED"
+    assert run.error_message
+    assert run.completed_at is not None

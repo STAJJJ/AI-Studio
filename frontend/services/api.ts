@@ -1,5 +1,6 @@
 import type { FaceSwapTaskResponse, FilePurpose, FileUploadResponse } from "@/types/face-swap";
 import type { ChatCompletionRequest, ChatRolesResponse, ChatStreamEvent } from "@/types/chat";
+import type { WorkflowHistoryListResponse, WorkflowRunDetail, WorkflowRunStatus, WorkflowType } from "@/types/history";
 import type {
   GenerateImageRequest,
   GenerateImageResponse,
@@ -59,6 +60,34 @@ export function generateImage(payload: GenerateImageRequest): Promise<GenerateIm
 
 export function getImageGenerationStatus(taskId: string): Promise<ImageGenerationStatusResponse> {
   return requestJson<ImageGenerationStatusResponse>(`/api/v1/images/tasks/${encodeURIComponent(taskId)}`, {
+    method: "GET",
+  });
+}
+
+
+export function getWorkflowHistory(params: {
+  workflowType?: WorkflowType;
+  status?: WorkflowRunStatus;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<WorkflowHistoryListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.workflowType) {
+    searchParams.set("workflow_type", params.workflowType);
+  }
+  if (params.status) {
+    searchParams.set("status", params.status);
+  }
+  searchParams.set("limit", String(params.limit ?? 20));
+  searchParams.set("offset", String(params.offset ?? 0));
+  const query = searchParams.toString();
+  return requestJson<WorkflowHistoryListResponse>(`/api/v1/history${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
+}
+
+export function getWorkflowHistoryRun(runId: string): Promise<WorkflowRunDetail> {
+  return requestJson<WorkflowRunDetail>(`/api/v1/history/${encodeURIComponent(runId)}`, {
     method: "GET",
   });
 }

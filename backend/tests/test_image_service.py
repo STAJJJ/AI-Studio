@@ -2,6 +2,9 @@ import json
 from pathlib import Path
 
 from app.services.comfyui.model_registry import ImageModelRegistry
+from app.schemas.history import WorkflowRunStatus, WorkflowType
+from app.services.history.memory_repository import InMemoryWorkflowHistoryRepository
+from app.services.history.service import WorkflowHistoryService
 from app.services.image_service import ImageGenerationRequest, ImageGenerationStatus, ImageService
 
 
@@ -174,3 +177,68 @@ def test_image_service_resolves_output_file_without_copying(tmp_path: Path) -> N
     service = ImageService(client=client, output_dir=output_dir)
 
     assert service.get_result_path("result.png") == image_path
+
+
+def test_image_service_creates_history_without_internal_workflow_payload(tmp_path: Path) -> None:
+    template_dir = tmp_path / "templates"
+    template_dir.mkdir()
+    (template_dir / "sd15_text_to_image.json").write_text(json.dumps({"save": {"class_type": "SaveImage", "inputs": {"filename_prefix": "AIStudio"}}}))
+    client = FakeComfyUIClient()
+    history = WorkflowHistoryService(InMemoryWorkflowHistoryRepository())
+    service = ImageService(
+        client=client,
+        model_registry=ImageModelRegistry(default_model_id="sd15", template_dir=template_dir),
+        history_service=history,
+    )
+
+    result = service.generate_image(ImageGenerationRequest(prompt="A cat", model="sd15", width=512, height=512))
+    run = history.get_by_external_task_id(WorkflowType.image_generation, result.task_id)
+
+    assert run.workflow_type == WorkflowType.image_generation
+    assert run.runtime == "comfyui"
+    assert run.provider == "sd15"
+    assert run.status == WorkflowRunStatus.running
+    assert run.input_payload == {"model": "sd15", "prompt": "A cat", "width": 512, "height": 512}
+    assert "class_type" not in str(run.input_payload)
+
+
+def test_image_service_updates_history_when_task_completes() -> None:
+    client = FakeComfyUIClient()
+    client.history = {
+        "prompt-abc": {
+            "status": {"completed": True, "status_str": "success"},
+            "outputs": {"7": {"images": [{"filename": "result.png", "subfolder": "", "type": "output"}]}},
+        }
+    }
+    history = WorkflowHistoryService(InMemoryWorkflowHistoryRepository())
+    history.create_image_generation_run(
+        external_task_id="prompt-abc", model="sd15", prompt="A cat", width=512, height=512
+    )
+    service = ImageService(client=client, history_service=history)
+
+    status = service.get_generation_status("prompt-abc")
+    run = history.get_by_external_task_id(WorkflowType.image_generation, "prompt-abc")
+
+    assert status.status == "completed"
+    assert run.status == WorkflowRunStatus.succeeded
+    assert run.result_file_id == "image:result.png"
+    assert run.output_payload == {"filename": "result.png", "image_url": "/api/v1/images/result/result.png"}
+    assert run.completed_at is not None
+
+
+def test_image_service_updates_history_when_task_fails() -> None:
+    client = FakeComfyUIClient()
+    client.history = {"prompt-abc": {"status": {"completed": False, "status_str": "error"}, "outputs": {}}}
+    history = WorkflowHistoryService(InMemoryWorkflowHistoryRepository())
+    history.create_image_generation_run(
+        external_task_id="prompt-abc", model="sd15", prompt="A cat", width=512, height=512
+    )
+    service = ImageService(client=client, history_service=history)
+
+    status = service.get_generation_status("prompt-abc")
+    run = history.get_by_external_task_id(WorkflowType.image_generation, "prompt-abc")
+
+    assert status.status == "failed"
+    assert run.status == WorkflowRunStatus.failed
+    assert run.error_code == "COMFYUI_TASK_FAILED"
+    assert run.completed_at is not None

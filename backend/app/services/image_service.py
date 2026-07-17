@@ -8,7 +8,10 @@ from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.services.comfyui.client import ComfyUIClient
 from app.services.comfyui.model_registry import ImageModelRegistry
+from app.schemas.history import WorkflowRunStatus, WorkflowType
 from app.services.comfyui.workflow import ComfyUIWorkflowTemplate
+from app.services.history.repository import WorkflowRunNotFoundError
+from app.services.history.service import WorkflowHistoryService, workflow_history_service
 
 
 DEFAULT_COMFYUI_OUTPUT_DIR = Path("/3241903007/workstation/LYJ/ComfyUI/output")
@@ -49,10 +52,12 @@ class ImageService:
         client: ComfyUIClient,
         model_registry: ImageModelRegistry | None = None,
         output_dir: Path = DEFAULT_COMFYUI_OUTPUT_DIR,
+        history_service: WorkflowHistoryService | None = None,
     ) -> None:
         self._client = client
         self._model_registry = model_registry or ImageModelRegistry()
         self._output_dir = output_dir
+        self._history = history_service or workflow_history_service
 
     def generate_image(self, request: ImageGenerationRequest) -> ImageGenerationResponse:
         model = self._model_registry.get_model(request.model)
@@ -65,6 +70,13 @@ class ImageService:
         )
         self._prepare_unique_workflow_run(workflow)
         prompt_id = self._client.submit_workflow(workflow)
+        self._history.create_image_generation_run(
+            external_task_id=prompt_id,
+            model=model.id,
+            prompt=request.prompt,
+            width=request.width or model.width,
+            height=request.height or model.height,
+        )
         return ImageGenerationResponse(task_id=prompt_id, status="running")
 
     def get_generation_status(self, task_id: str) -> ImageGenerationStatus:
@@ -81,11 +93,34 @@ class ImageService:
         completed = status_payload.get("completed") is True
 
         if status_str in {"error", "failed"}:
+            self._update_history_if_present(
+                task_id,
+                status=WorkflowRunStatus.failed,
+                progress=100,
+                error_code="COMFYUI_TASK_FAILED",
+                error_message="ComfyUI reported task failure",
+            )
             return ImageGenerationStatus(task_id=task_id, status="failed", progress=100, image_url=None)
 
         if completed:
             filename = self._extract_first_output_filename(task_history)
             image_url = f"/api/v1/images/result/{quote(filename)}" if filename else None
+            if image_url:
+                self._update_history_if_present(
+                    task_id,
+                    status=WorkflowRunStatus.succeeded,
+                    progress=100,
+                    result_file_id=f"image:{filename}",
+                    output_payload={"filename": filename, "image_url": image_url},
+                )
+            else:
+                self._update_history_if_present(
+                    task_id,
+                    status=WorkflowRunStatus.failed,
+                    progress=100,
+                    error_code="COMFYUI_OUTPUT_NOT_FOUND",
+                    error_message="ComfyUI completed without an output image",
+                )
             return ImageGenerationStatus(
                 task_id=task_id,
                 status="completed" if image_url else "failed",
@@ -93,6 +128,7 @@ class ImageService:
                 image_url=image_url,
             )
 
+        self._update_history_if_present(task_id, status=WorkflowRunStatus.running, progress=50)
         return ImageGenerationStatus(task_id=task_id, status="running", progress=50, image_url=None)
 
     def get_result_path(self, filename: str) -> Path:
@@ -105,6 +141,12 @@ class ImageService:
         if not path.is_file():
             raise ImageResultNotFoundError(f"Image result not found: {filename}")
         return path
+
+    def _update_history_if_present(self, task_id: str, **changes: object) -> None:
+        try:
+            self._history.update_by_external_task_id(WorkflowType.image_generation, task_id, **changes)
+        except WorkflowRunNotFoundError:
+            return
 
     def _prepare_unique_workflow_run(self, workflow: dict[str, Any]) -> None:
         run_id = uuid.uuid4()
