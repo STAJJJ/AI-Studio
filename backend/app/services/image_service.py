@@ -14,8 +14,6 @@ from app.services.history.repository import WorkflowRunNotFoundError
 from app.services.history.service import WorkflowHistoryService, workflow_history_service
 
 
-DEFAULT_COMFYUI_OUTPUT_DIR = Path("/3241903007/workstation/LYJ/ComfyUI/output")
-
 ImageTaskStatus = Literal["pending", "running", "completed", "failed"]
 
 
@@ -51,12 +49,12 @@ class ImageService:
         self,
         client: ComfyUIClient,
         model_registry: ImageModelRegistry | None = None,
-        output_dir: Path = DEFAULT_COMFYUI_OUTPUT_DIR,
+        output_dir: Path | None = None,
         history_service: WorkflowHistoryService | None = None,
     ) -> None:
         self._client = client
         self._model_registry = model_registry or ImageModelRegistry()
-        self._output_dir = output_dir
+        self._output_dir = output_dir or get_settings().comfyui_output_dir
         self._history = history_service or workflow_history_service
 
     def generate_image(self, request: ImageGenerationRequest) -> ImageGenerationResponse:

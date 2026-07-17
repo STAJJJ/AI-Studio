@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { useFaceSwap } from "@/hooks/use-face-swap";
 import { resolveApiAssetUrl } from "@/services/api";
 
+const acceptedImageTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+const maxUploadSizeBytes = 10 * 1024 * 1024;
+
 const phaseCopy = {
   idle: {
     title: "Ready to swap",
@@ -41,6 +44,7 @@ interface PreviewState {
 export function FaceSwapPanel() {
   const [source, setSource] = useState<PreviewState>({ file: null, url: null });
   const [target, setTarget] = useState<PreviewState>({ file: null, url: null });
+  const [validationError, setValidationError] = useState<string | null>(null);
   const previewUrlsRef = useRef<{ source: string | null; target: string | null }>({ source: null, target: null });
   const { phase, isBusy, sourceUpload, targetUpload, task, error, start, reset } = useFaceSwap();
 
@@ -65,6 +69,16 @@ export function FaceSwapPanel() {
     if (previousUrl) {
       URL.revokeObjectURL(previousUrl);
     }
+    const validationMessage = validateImageFile(nextFile);
+    if (validationMessage) {
+      event.target.value = "";
+      previewUrlsRef.current[kind] = null;
+      setter({ file: null, url: null });
+      setValidationError(validationMessage);
+      return;
+    }
+
+    setValidationError(null);
     const nextUrl = nextFile ? URL.createObjectURL(nextFile) : null;
     previewUrlsRef.current[kind] = nextUrl;
     setter({ file: nextFile, url: nextUrl });
@@ -75,10 +89,12 @@ export function FaceSwapPanel() {
     if (!source.file || !target.file || isBusy) {
       return;
     }
+    setValidationError(null);
     await start({ sourceFile: source.file, targetFile: target.file });
   }
 
   function handleTryAgain() {
+    setValidationError(null);
     reset();
   }
 
@@ -118,6 +134,12 @@ export function FaceSwapPanel() {
                   onChange={(event) => updatePreview("target", event)}
                 />
               </div>
+
+              {validationError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {validationError}
+                </div>
+              ) : null}
 
               <Button className="w-full" disabled={!canSubmit} type="submit">
                 <Shuffle className="h-4 w-4" aria-hidden="true" />
@@ -247,6 +269,19 @@ function ImagePicker({ id, label, description, file, previewUrl, onChange }: Ima
       {file ? <p className="mt-2 truncate text-xs text-muted-foreground">{file.name}</p> : null}
     </div>
   );
+}
+
+function validateImageFile(file: File | null): string | null {
+  if (!file) {
+    return null;
+  }
+  if (!acceptedImageTypes.has(file.type)) {
+    return "Please upload a PNG, JPG, or WebP image.";
+  }
+  if (file.size > maxUploadSizeBytes) {
+    return "Image size must be 10 MB or smaller.";
+  }
+  return null;
 }
 
 interface TaskMetaProps {

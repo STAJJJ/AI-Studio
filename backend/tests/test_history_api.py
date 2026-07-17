@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from uuid import uuid4
 
 from app.main import app
 from app.schemas.history import WorkflowRunCreate, WorkflowRunStatus, WorkflowType
@@ -20,7 +21,7 @@ def create_history_run(title: str = "History Item", workflow_type: WorkflowType 
             input_payload={"prompt": "summary"} if workflow_type == WorkflowType.image_generation else {"source_file_id": "file_a", "target_file_id": "file_b"},
             output_payload={"filename": "result.png"},
             result_file_id="file_result",
-            external_task_id=f"external_{title}",
+            external_task_id=f"external_{title}_{uuid4().hex}",
         )
     )
 
@@ -28,7 +29,7 @@ def create_history_run(title: str = "History Item", workflow_type: WorkflowType 
 def test_history_list_endpoint_returns_summary_and_dynamic_result_url() -> None:
     run = create_history_run("List Item")
 
-    response = client.get("/api/v1/history")
+    response = client.get("/api/v1/history?limit=100")
 
     assert response.status_code == 200
     payload = response.json()

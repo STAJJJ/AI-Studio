@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from threading import Thread
 from typing import Protocol
 
@@ -97,13 +98,14 @@ class FaceSwapService:
                 },
             )
         except Exception as exc:  # noqa: BLE001 - background task boundary must persist failures.
-            self._tasks.mark_failed(task.id, code="FACEFUSION_EXECUTION_FAILED", message=str(exc))
+            safe_message = self._safe_error_message(str(exc))
+            self._tasks.mark_failed(task.id, code="FACEFUSION_EXECUTION_FAILED", message=safe_message)
             self._update_history_if_present(
                 task.id,
                 status=WorkflowRunStatus.failed,
                 progress=100,
                 error_code="FACEFUSION_EXECUTION_FAILED",
-                error_message=str(exc),
+                error_message=safe_message,
             )
 
     def _update_history_if_present(self, task_id: str, **changes: object) -> None:
@@ -160,6 +162,11 @@ class FaceSwapService:
     def _summarize_text(self, value: str, limit: int = 1200) -> str:
         normalized = "\n".join(line.strip() for line in value.splitlines() if line.strip())
         return normalized[-limit:]
+
+    def _safe_error_message(self, value: str) -> str:
+        without_user_paths = re.sub(r"/Users/[^\\s:]+", "[local-path]", value)
+        without_server_paths = re.sub(r"/3241903007/[^\\s:]+", "[local-path]", without_user_paths)
+        return without_server_paths
 
 
 def build_facefusion_executor(settings: Settings) -> FaceFusionExecutor:

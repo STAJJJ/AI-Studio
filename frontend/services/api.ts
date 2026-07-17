@@ -19,7 +19,7 @@ async function requestJson<TResponse>(path: string, init: RequestInit): Promise<
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}`);
+    throw new Error(extractErrorMessage(message) || `Request failed with status ${response.status}`);
   }
 
   return (await response.json()) as TResponse;
@@ -33,7 +33,7 @@ async function requestForm<TResponse>(path: string, formData: FormData): Promise
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}`);
+    throw new Error(extractErrorMessage(message) || `Request failed with status ${response.status}`);
   }
 
   return (await response.json()) as TResponse;
@@ -204,8 +204,14 @@ function handleSseEvent(rawEvent: string, onDelta: (content: string) => void): b
 
 function extractErrorMessage(message: string): string {
   try {
-    const payload = JSON.parse(message) as { detail?: string };
-    return payload.detail ?? message;
+    const payload = JSON.parse(message) as { detail?: string | Array<{ msg?: string }> };
+    if (typeof payload.detail === "string") {
+      return payload.detail;
+    }
+    if (Array.isArray(payload.detail)) {
+      return payload.detail.map((item) => item.msg).filter(Boolean).join("; ");
+    }
+    return message;
   } catch {
     return message;
   }

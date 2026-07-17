@@ -15,9 +15,10 @@ client = TestClient(app)
 
 
 class FakeFaceFusionExecutor:
-    def __init__(self, exit_code: int = 0, write_output: bool = True) -> None:
+    def __init__(self, exit_code: int = 0, write_output: bool = True, stderr: str | None = None) -> None:
         self.exit_code = exit_code
         self.write_output = write_output
+        self.stderr = stderr
         self.calls = []
 
     def execute(self, source_path: Path, target_path: Path, output_path: Path) -> ExecutionResult:
@@ -34,7 +35,7 @@ class FakeFaceFusionExecutor:
         return ExecutionResult(
             command=["python", "facefusion.py", "headless-run"],
             stdout="fake stdout",
-            stderr="fake stderr" if self.exit_code else "",
+            stderr=self.stderr if self.stderr is not None else ("fake stderr" if self.exit_code else ""),
             exit_code=self.exit_code,
             duration_seconds=0.25,
             output_path=output_path,
@@ -250,3 +251,33 @@ def test_face_swap_updates_history_on_failure(monkeypatch: pytest.MonkeyPatch) -
     assert run.error_code == "FACEFUSION_EXECUTION_FAILED"
     assert run.error_message
     assert run.completed_at is not None
+
+
+def test_face_swap_failure_message_does_not_expose_absolute_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        face_swap_service,
+        "_executor",
+        FakeFaceFusionExecutor(
+            exit_code=1,
+            write_output=False,
+            stderr="failed at /Users/lyj/private/source.png and /3241903007/workstation/secret/output.png",
+        ),
+    )
+    source_file_id = upload_test_file("source.png", "image/png", "source_face")
+    target_file_id = upload_test_file("target.png", "image/png", "target_image")
+
+    create_response = client.post(
+        "/api/v1/face-swap/tasks",
+        json={"source_file_id": source_file_id, "target_file_id": target_file_id},
+    )
+    assert create_response.status_code == 201
+    task_id = create_response.json()["task_id"]
+    final_payload = wait_for_terminal_task(task_id)
+
+    run = face_swap_service._history.get_by_external_task_id(WorkflowType.face_swap, task_id)
+    serialized_task = str(final_payload)
+    serialized_run = str(run.model_dump())
+    assert "/Users/" not in serialized_task
+    assert "/3241903007/" not in serialized_task
+    assert "/Users/" not in serialized_run
+    assert "/3241903007/" not in serialized_run

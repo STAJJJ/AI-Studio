@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+import sys
 from typing import Literal
 
 from pydantic import Field
@@ -25,8 +26,8 @@ class Settings(BaseSettings):
     history_backend: Literal["memory", "sqlite"] = "sqlite"
     database_url: str = Field(default=f"sqlite:///{PROJECT_ROOT / 'data' / 'ai_studio.db'}")
 
-    facefusion_project_path: Path = Field(default=Path("/3241903007/workstation/LYJ/FaceFusion/facefusion"))
-    facefusion_python_path: str = Field(default="/opt/conda/envs/df/bin/python")
+    facefusion_project_path: Path = Field(default=PROJECT_ROOT.parent / "FaceFusion" / "facefusion")
+    facefusion_python_path: str = Field(default=sys.executable)
     facefusion_execution_provider: str = Field(default="cpu")
     facefusion_device_id: int = Field(default=0)
     facefusion_timeout_seconds: int = Field(default=300)
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
     runtime_gpu_name: str = Field(default="Apple Silicon MPS")
     comfyui_base_url: str = Field(default="http://127.0.0.1:8188")
     comfyui_timeout_seconds: int = Field(default=120)
-    comfyui_output_dir: Path = Field(default=Path("/Users/lyj/WorkStation/Project/ComfyUI/output"))
+    comfyui_output_dir: Path = Field(default=PROJECT_ROOT.parent / "ComfyUI" / "output")
 
     llm_base_url: str = Field(default="https://ark.cn-beijing.volces.com/api/v3")
     llm_api_key: str = Field(default="")
@@ -44,7 +45,7 @@ class Settings(BaseSettings):
     llm_max_context_messages: int = Field(default=20)
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(PROJECT_ROOT / ".env", ".env"),
         env_file_encoding="utf-8",
         env_prefix="AI_STUDIO_",
         case_sensitive=False,

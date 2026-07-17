@@ -55,6 +55,7 @@ export function HistoryPanel() {
     refresh,
   } = useHistory({ initialRunId: runId });
   const resultUrl = resolveApiAssetUrl(selectedRun?.result_url ?? null);
+  const detailError = runId && !selectedRun && error ? error : null;
 
   function handleSelectRun(runId: string) {
     router.push(`/history?run_id=${encodeURIComponent(runId)}`);
@@ -162,8 +163,16 @@ export function HistoryPanel() {
           </CardHeader>
           <CardContent>
             {!selectedRun && !detailLoading ? (
-              <div className="flex min-h-96 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-6 text-center">
-                <p className="max-w-md text-sm text-muted-foreground">Select a workflow run to view details, preview output, or download the result.</p>
+              <div className={[
+                "flex min-h-96 items-center justify-center rounded-lg border border-dashed p-6 text-center",
+                detailError ? "border-destructive/30 bg-destructive/5" : "bg-muted/30",
+              ].join(" ")}>
+                <div className="max-w-md space-y-2">
+                  <p className={detailError ? "text-sm font-medium text-destructive" : "text-sm text-muted-foreground"}>
+                    {detailError ? "Workflow run not found" : "Select a workflow run to view details, preview output, or download the result."}
+                  </p>
+                  {detailError ? <p className="text-sm text-destructive/90">{detailError}</p> : null}
+                </div>
               </div>
             ) : null}
 

@@ -11,7 +11,7 @@ Enterprise AI Application Platform
 </p>
 
 <p align="center">
-FastAPI • Next.js • ComfyUI • FaceFusion • DeepSeek
+FastAPI • Next.js • ComfyUI • FaceFusion • DeepSeek • SQLite
 </p>
 
 <p align="center">
@@ -19,32 +19,25 @@ FastAPI • Next.js • ComfyUI • FaceFusion • DeepSeek
   <img src="https://img.shields.io/badge/FastAPI-0.116.1-009688" alt="FastAPI">
   <img src="https://img.shields.io/badge/Next.js-15-black" alt="Next.js">
   <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Version-v0.10.0-success" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v1.0.0-success" alt="Version">
   <img src="https://img.shields.io/badge/License-Not%20specified-lightgrey" alt="License">
 </p>
 
 ## Why AI Studio
 
-Modern AIGC applications often need to integrate multiple AI runtimes at the same time:
+Modern AIGC applications often need to integrate image generation engines, face editing pipelines, and large language models at the same time. These runtimes usually have different APIs, execution models, configuration formats, and operational boundaries.
 
-- Image generation engines
-- Face editing pipelines
-- Large language models
-
-These runtimes usually have different APIs, execution models, configuration formats, and operational boundaries. AI Studio is not designed to wrap a single model. Its goal is to provide a platform-oriented engineering structure that can unify these runtimes behind consistent application services.
-
-The project focuses on platform design, runtime isolation, and maintainable architecture. Each AI capability is exposed through a web interface, routed through FastAPI, and implemented behind dedicated services, registries, gateways, or executors.
+AI Studio is not a wrapper around one model. It is a local application platform that unifies multiple AI runtimes behind a consistent FastAPI service layer and a focused Next.js workspace.
 
 ## Highlights
 
-- **Enterprise AI Platform**: unifies image generation, face swap, and AI chat in one application structure.
-- **Text-to-Image**: generates images through ComfyUI workflows and backend model selection.
-- **Face Swap**: executes image-based face swap workflows through FaceFusion.
-- **AI Chat**: provides role-based conversations through DeepSeek and an OpenAI-compatible gateway.
-- **Streaming LLM**: forwards real upstream SSE responses instead of simulated streaming.
-- **Registry-based Architecture**: manages image models, workflow templates, LLM clients, and chat roles through registries.
-- **FastAPI Service Layer**: keeps API endpoints thin and delegates workflow logic to services.
-- **Modern Next.js UI**: provides focused pages for image generation, face swap, and chat workflows.
+- **AI Chat**: role-based DeepSeek conversations with real SSE streaming.
+- **Text to Image**: ComfyUI workflow submission with model registry selection.
+- **Face Swap**: FaceFusion-backed image face swap workflow.
+- **Workflow History**: unified records for image generation and face swap runs.
+- **SQLite Persistence**: workflow records survive backend restarts.
+- **Workspace Sidebar**: desktop Sidebar, mobile drawer, and recent workflow shortcuts.
+- **Runtime Isolation**: ComfyUI, FaceFusion, and LLM provider details stay behind services, clients, registries, or executors.
 
 ## Screenshots
 
@@ -58,122 +51,96 @@ The project focuses on platform design, runtime isolation, and maintainable arch
 
 ## Architecture
 
-AI Studio routes all user-facing workflows through a service layer. Image generation, face swap, and chat each have different runtime requirements, but the API layer stays consistent and lightweight. Runtime-specific details stay inside integration modules, so ComfyUI, FaceFusion, and DeepSeek can evolve independently from the application surface.
-
-<!-- If assets/architecture.svg is added later, it can replace the Mermaid diagram below. -->
+All user-facing workflows enter through the Next.js workspace and FastAPI API layer. Endpoints stay thin; workflow behavior lives in services. Runtime-specific details stay isolated so ComfyUI, FaceFusion, and DeepSeek can evolve independently from the application surface.
 
 ```mermaid
 flowchart TD
     Frontend["Next.js Frontend"]
-    Gateway["FastAPI Gateway"]
-
-    ImageAPI["Image API"]
-    FaceAPI["Face Swap API"]
-    ChatAPI["Chat API"]
-    FileAPI["File API"]
-    TaskAPI["Task API"]
-
-    ImageService["ImageService"]
-    FaceService["FaceSwapService"]
-    ChatService["ChatService"]
-    FileService["FileService"]
-    TaskManager["TaskManager"]
-
-    ImageRegistry["Image Model Registry"]
-    WorkflowLoader["Workflow Loader"]
-    LLMGateway["LLM Gateway"]
-    LLMRegistry["LLM Registry"]
-    RoleRegistry["Role Registry"]
-    Executor["Executor Layer"]
-
+    API["FastAPI REST API / SSE"]
+    Service["Service Layer"]
+    Chat["LLM Gateway"]
+    Image["Image Generation"]
+    Face["Face Swap"]
+    History["Workflow History"]
+    Storage["SQLite / Local File Storage"]
+    DeepSeek["DeepSeek / Volcengine Ark"]
     ComfyUI["ComfyUI"]
     FaceFusion["FaceFusion"]
-    DeepSeek["DeepSeek via Volcengine Ark"]
 
-    Frontend --> Gateway
-    Gateway --> ImageAPI
-    Gateway --> FaceAPI
-    Gateway --> ChatAPI
-    Gateway --> FileAPI
-    Gateway --> TaskAPI
-
-    ImageAPI --> ImageService
-    FaceAPI --> FaceService
-    ChatAPI --> ChatService
-    FileAPI --> FileService
-    TaskAPI --> TaskManager
-
-    ImageService --> ImageRegistry
-    ImageService --> WorkflowLoader
-    ImageService --> ComfyUI
-
-    FaceService --> FileService
-    FaceService --> TaskManager
-    FaceService --> Executor
-    Executor --> FaceFusion
-
-    ChatService --> RoleRegistry
-    ChatService --> LLMGateway
-    LLMGateway --> LLMRegistry
-    LLMRegistry --> DeepSeek
+    Frontend --> API
+    API --> Service
+    Service --> Chat
+    Service --> Image
+    Service --> Face
+    Service --> History
+    History --> Storage
+    Face --> Storage
+    Chat --> DeepSeek
+    Image --> ComfyUI
+    Face --> FaceFusion
 ```
 
 ## Design Principles
 
 ### Modular Services
 
-Each AI capability is implemented by a dedicated service. `ImageService`, `FaceSwapService`, and `ChatService` keep their workflow logic separate while sharing common API, file, task, and configuration patterns.
+Each AI capability is implemented by a dedicated service. `ChatService`, `ImageService`, `FaceSwapService`, `FileService`, and `WorkflowHistoryService` keep responsibilities clear.
 
 ### Runtime Isolation
 
-Business logic is decoupled from runtime-specific details. ComfyUI integration lives behind its client and workflow loader, FaceFusion runs through an executor boundary, and DeepSeek is accessed through the LLM gateway and client registry.
+Business logic is decoupled from runtime-specific details. ComfyUI integration lives behind an HTTP client and workflow loader, FaceFusion runs through an executor boundary, and DeepSeek is accessed through the LLM gateway.
 
 ### Registry Pattern
 
-Registries are used where runtime choices should remain configurable and extensible. The current codebase includes image model registry, LLM client registry, and chat role registry patterns.
+Registries manage runtime choices that need to stay configurable, including image models, workflow templates, LLM clients, and chat roles.
 
 ### Thin Controllers
 
-FastAPI endpoints stay lightweight. Request handling, validation orchestration, runtime calls, and response shaping are delegated to services.
-
-### Streaming First
-
-The chat workflow uses real upstream streaming from the LLM provider. The backend forwards SSE events to the frontend instead of waiting for a full response and splitting it locally.
+FastAPI endpoints handle request/response boundaries and delegate orchestration to services.
 
 ### Configuration Driven
 
-Runtime paths, provider URLs, model identifiers, file limits, timeout values, and environment-specific settings are managed through Pydantic Settings and local environment files.
+Runtime paths, provider URLs, model identifiers, file limits, timeouts, and SQLite location are managed through Pydantic Settings and local environment files.
 
 ## Features
 
-### Image Generation
+### AI Chat
 
-Generate images through ComfyUI workflows from the web UI. AI Studio selects the target image model through a backend registry, loads the matching workflow template, submits the workflow to ComfyUI, and returns the generated image for preview and download.
+Chat with role-based assistants through the backend LLM Gateway. The frontend sends browser-session context, the backend injects the selected role prompt, and the client streams provider responses as SSE events.
 
-Current model entries include Stable Diffusion 1.5 and FLUX.1 Schnell FP8 workflow support when the required checkpoint is available locally.
+Current roles:
+
+- General Assistant
+- AIGC Engineer
+- Interview Coach
+
+### Text to Image
+
+Generate images through ComfyUI workflows. AI Studio selects the target model through a backend registry, loads the matching workflow template, submits the workflow to ComfyUI, polls task status, and returns the generated image for preview and download.
+
+Current registry entries:
+
+- Stable Diffusion 1.5
+- FLUX.1 Schnell FP8, when the checkpoint is available locally
 
 ### Face Swap
 
-Run image-based face swap workflows through the platform UI. Users upload source and target images, create a face swap task, wait for execution, preview the result, and download the output.
+Upload a source face and target image, create a face swap task, run FaceFusion through the executor boundary, then preview and download the result.
 
-The runtime is isolated through `FaceFusionExecutor`, while file metadata and task state are handled by `FileService` and `TaskManager`.
+### Workflow History
 
-### AI Chat
-
-Chat with DeepSeek through an OpenAI-compatible backend gateway. The frontend sends a browser-session message context, the backend injects the selected role prompt, and the LLM client streams provider responses back through SSE.
-
-The current role registry includes General Assistant, AIGC Engineer, and Interview Coach. The chat UI supports streaming output, stop generation, clear conversation, and new conversation controls.
+Image generation and face swap runs are stored in SQLite and displayed in a unified History workspace. Sidebar Recent Workflows links open detail views with `/history?run_id=...`.
 
 ## Tech Stack
 
 | Layer | Stack |
 | --- | --- |
-| Frontend | Next.js 15, React 19, TypeScript strict mode, Tailwind CSS, local shadcn-style UI primitives |
-| Backend | Python 3.12, FastAPI, Pydantic Settings, Uvicorn, pytest |
-| Image Runtime | ComfyUI, Stable Diffusion 1.5 workflow, FLUX.1 Schnell FP8 workflow support |
-| Face Runtime | FaceFusion executor integration |
+| Frontend | Next.js 15, React 19, TypeScript strict mode, Tailwind CSS, local shadcn-style primitives |
+| Backend | Python 3.12, FastAPI, Pydantic Settings, SQLAlchemy, Uvicorn, pytest |
+| Persistence | SQLite |
+| Image Runtime | ComfyUI, SD1.5 workflow, FLUX workflow support |
+| Face Runtime | FaceFusion CLI executor |
 | LLM Runtime | DeepSeek through Volcengine Ark, OpenAI-compatible chat completions, SSE streaming |
-| Engineering | Router / Service / Executor / Registry layering, environment-driven configuration, unit tests |
 
 ## Project Structure
 
@@ -181,32 +148,33 @@ The current role registry includes General Assistant, AIGC Engineer, and Intervi
 AI-Studio/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/endpoints/       # Thin REST endpoints
-│   │   ├── core/                   # Settings and logging
+│   │   ├── api/v1/endpoints/       # REST and SSE endpoint boundaries
+│   │   ├── core/                   # Settings, database, logging
 │   │   ├── executors/              # Mock and FaceFusion executors
-│   │   ├── schemas/                # Pydantic request/response models
+│   │   ├── models/                 # SQLAlchemy models
+│   │   ├── schemas/                # Pydantic schemas
 │   │   └── services/
 │   │       ├── comfyui/            # Client, workflow loader, image model registry
 │   │       ├── files/              # FileService
+│   │       ├── history/            # Workflow history repositories and service
 │   │       ├── jobs/               # TaskManager
 │   │       └── llm/                # LLM gateway, registry, clients, role registry
-│   ├── tests/                      # Backend unit and integration tests
+│   ├── tests/
 │   ├── requirements.txt
 │   └── requirements-dev.txt
 ├── frontend/
 │   ├── app/                        # Next.js App Router pages
-│   ├── components/                 # Feature panels and shared UI components
+│   ├── components/                 # Workspace panels and UI primitives
 │   ├── hooks/                      # Browser workflow state
 │   ├── services/                   # API client functions
 │   └── types/                      # TypeScript API types
 ├── data/
-│   ├── uploads/                    # Local upload storage
-│   └── outputs/                    # Local output storage
-├── docs/                           # Technical design notes
-├── assets/                         # Reserved GitHub presentation assets
-├── workflows/
+│   ├── uploads/                    # Ignored local upload storage
+│   └── outputs/                    # Ignored local output storage
+├── docs/
+│   └── releases/
 ├── scripts/
-├── prompts/
+├── assets/
 └── README.md
 ```
 
@@ -219,9 +187,9 @@ git clone https://github.com/STAJJJ/AI-Studio.git
 cd AI-Studio
 ```
 
-### 2. Backend
+### 2. Backend Environment
 
-Use the existing Conda environment for local development.
+Use your existing Conda environment. This project was validated locally with the `studio` environment.
 
 ```bash
 conda activate studio
@@ -229,25 +197,98 @@ cd backend
 pip install -r requirements-dev.txt
 ```
 
-Create local backend configuration from the example file:
+### 3. Frontend Dependencies
 
 ```bash
-cp ../.env.example .env
+cd ../frontend
+npm install
 ```
 
-Configure the values needed for your local runtimes:
+### 4. Local Configuration
 
-```env
-AI_STUDIO_COMFYUI_BASE_URL=http://127.0.0.1:8188
-AI_STUDIO_LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
-AI_STUDIO_LLM_API_KEY=replace-with-your-api-key
-AI_STUDIO_LLM_DEFAULT_MODEL=replace-with-your-endpoint-id
-```
-
-Run the backend:
+Create a local environment file:
 
 ```bash
-uvicorn app.main:app --host 127.0.0.1 --port 8002
+cd ..
+cp .env.example .env
+```
+
+Review the runtime values in `.env`. Chat, Image Generation, and Face Swap require their corresponding local runtimes or provider credentials to be configured.
+
+### 5. Start Both Services
+
+```bash
+./scripts/start-dev.sh
+```
+
+Open:
+
+```text
+Frontend: http://127.0.0.1:3000
+Backend API docs: http://127.0.0.1:8002/docs
+```
+
+## Environment Variables
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_STUDIO_UPLOAD_DIR` | Local upload storage directory |
+| `AI_STUDIO_OUTPUT_DIR` | Local Face Swap output directory |
+| `AI_STUDIO_DATABASE_URL` | SQLite database URL |
+| `AI_STUDIO_DEFAULT_IMAGE_MODEL` | Default image registry key, usually `sd15` |
+| `AI_STUDIO_COMFYUI_BASE_URL` | ComfyUI HTTP API URL |
+| `AI_STUDIO_COMFYUI_OUTPUT_DIR` | ComfyUI output directory used for result lookup |
+| `AI_STUDIO_FACEFUSION_PROJECT_PATH` | Local FaceFusion project path |
+| `AI_STUDIO_FACEFUSION_PYTHON_PATH` | Python executable used to run FaceFusion |
+| `AI_STUDIO_FACEFUSION_EXECUTION_PROVIDER` | FaceFusion execution provider, for example `cpu` or `coreml` |
+| `AI_STUDIO_LLM_BASE_URL` | OpenAI-compatible LLM provider base URL |
+| `AI_STUDIO_LLM_API_KEY` | LLM provider API key. Never commit real keys |
+| `AI_STUDIO_LLM_DEFAULT_MODEL` | Backend model or provider endpoint mapping |
+| `AI_STUDIO_RUNTIME_GPU_NAME` | Display-only runtime label for the homepage |
+
+## Run Services Separately
+
+Backend:
+
+```bash
+conda activate studio
+cd backend
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8002
+```
+
+Frontend:
+
+```bash
+cd frontend
+AI_STUDIO_API_BASE_URL=http://127.0.0.1:8002 npm run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+## Testing And Quality Checks
+
+Run the full local check:
+
+```bash
+./scripts/check.sh
+```
+
+Or run each step manually:
+
+```bash
+cd backend
+python -m pytest -q
+
+cd ../frontend
+npm run typecheck
+npm run lint
+npm run build
+```
+
+## API Documentation
+
+When the backend is running:
+
+```text
+http://127.0.0.1:8002/docs
 ```
 
 Health check:
@@ -256,82 +297,58 @@ Health check:
 curl http://127.0.0.1:8002/api/v1/health
 ```
 
-Swagger:
+## Data And Privacy
 
-```text
-http://127.0.0.1:8002/docs
-```
+- `.env` files are ignored by Git.
+- SQLite database files under `data/` are ignored by Git.
+- Uploads and generated outputs under `data/uploads` and `data/outputs` are ignored by Git.
+- Do not commit API keys, local model paths containing private information, uploaded user images, or generated private results.
+- `tests/assets` contains only small test images required for automated tests.
 
-### 3. Frontend
+## Current Limitations
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open:
-
-```text
-http://127.0.0.1:3000
-```
-
-The frontend proxies `/api/v1/*` requests to `http://127.0.0.1:8002` by default. Override it with `AI_STUDIO_API_BASE_URL` if needed.
-
-### 4. Verification
-
-Backend:
-
-```bash
-cd backend
-python -m pytest -q
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm run typecheck
-npm run build
-```
+- The project is a local portfolio application and does not include authentication or multi-user isolation.
+- ComfyUI and FaceFusion are external local runtimes and are not installed by this repository.
+- FLUX generation requires the corresponding local checkpoint.
+- Chat requires a valid OpenAI-compatible DeepSeek provider configuration.
+- Workflow History stores metadata in SQLite, not a production database.
+- Docker deployment is intentionally out of scope for this release.
 
 ## Roadmap
 
 ### Completed
 
 - v0.1: FastAPI backend architecture initialization
-- v0.2: LLM gateway with OpenAI-compatible chat API foundation
-- v0.3: File workflow and mock face swap task lifecycle
-- v0.4: FaceFusion executor integration
+- v0.2: LLM Gateway foundation
+- v0.3: File workflow and mock task lifecycle
+- v0.4: FaceFusion executor validation
 - v0.5: ComfyUI image generation integration
 - v0.6: First Next.js web demo
 - v0.7: End-to-end image generation workflow
 - v0.8: End-to-end face swap workflow
 - v0.9: Image model registry and dynamic workflow selection
-- v0.10: End-to-end AI chat with DeepSeek streaming
+- v0.10: End-to-end AI Chat with DeepSeek streaming
+- v0.11: Unified Workflow History
+- v0.12: SQLite persistence
+- v0.13: Workspace Sidebar UI
+- v1.0: Portfolio-ready release polish
 
 ### Planned
 
-- v0.11: Browser-visible workflow records
-- v0.12: Runtime status page
-- v1.0: Stable release documentation and presentation package
+- Improve runtime setup diagnostics
+- Add richer workflow detail views
+- Add optional deployment guide
+- Expand automated frontend tests
 
 ## Version History
 
 | Version | Summary |
 | --- | --- |
-| v0.1.0 | Initialized the FastAPI backend architecture, configuration, health check, and project structure. |
-| v0.2.0 | Added the LLM gateway, client registry, and OpenAI-compatible chat API foundation. |
-| v0.3.0 | Added file management, task lifecycle management, and mock face swap workflow execution. |
-| v0.4.0 | Integrated FaceFusion executor validation through CLI-based execution. |
-| v0.5.0 | Integrated ComfyUI image generation through HTTP workflow submission. |
-| v0.6.0 | Added the first Next.js web demo with homepage and image generation page. |
-| v0.7.0 | Completed the end-to-end image generation workflow with polling, preview, and download. |
-| v0.7.1 | Polished the image generation experience and fixed repeated prompt output handling. |
-| v0.8.0 | Completed the end-to-end face swap workflow with upload, polling, preview, and download. |
-| v0.8.1 | Polished the face swap page styling. |
-| v0.9.0 | Added image model registry and dynamic workflow selection for SD1.5 and FLUX. |
-| v0.10.0 | Added end-to-end AI chat with role registry, DeepSeek integration, SSE streaming, and multi-turn context. |
+| v0.10.0 | Added end-to-end AI Chat with role registry, DeepSeek integration, SSE streaming, and multi-turn context. |
+| v0.11.0 | Added unified Workflow History for image generation and face swap workflows. |
+| v0.12.0 | Added SQLite persistence for workflow history. |
+| v0.13.0 | Added Workspace Sidebar navigation and mobile drawer. |
+| v1.0.0 | Portfolio-ready release polish, scripts, documentation, and validation package. |
 
 ## License
 
