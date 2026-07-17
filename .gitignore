@@ -24,6 +24,11 @@ venv/
 # Runtime data
 data/uploads/*
 data/outputs/*
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.db-shm
+data/*.db-wal
 !data/uploads/.gitkeep
 !data/outputs/.gitkeep
 

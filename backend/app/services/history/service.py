@@ -7,7 +7,7 @@ from app.schemas.history import (
     WorkflowRunSummaryResponse,
     WorkflowType,
 )
-from app.services.history.memory_repository import InMemoryWorkflowHistoryRepository
+from app.services.history.factory import get_workflow_history_repository
 from app.services.history.repository import WorkflowHistoryRepository, WorkflowRunNotFoundError
 
 
@@ -127,4 +127,4 @@ class WorkflowHistoryService:
         return f"{self._title_from_text(prompt, 120)} ({width}x{height})"
 
 
-workflow_history_service = WorkflowHistoryService(InMemoryWorkflowHistoryRepository())
+workflow_history_service = WorkflowHistoryService(get_workflow_history_repository())

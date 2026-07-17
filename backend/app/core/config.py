@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     upload_dir: Path = Field(default=PROJECT_ROOT / "data" / "uploads")
     output_dir: Path = Field(default=PROJECT_ROOT / "data" / "outputs")
     mock_executor_delay_seconds: float = 2.0
+    history_backend: Literal["memory", "sqlite"] = "sqlite"
+    database_url: str = Field(default=f"sqlite:///{PROJECT_ROOT / 'data' / 'ai_studio.db'}")
 
     facefusion_project_path: Path = Field(default=Path("/3241903007/workstation/LYJ/FaceFusion/facefusion"))
     facefusion_python_path: str = Field(default="/opt/conda/envs/df/bin/python")
