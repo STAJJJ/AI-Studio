@@ -1,19 +1,27 @@
-# AI Studio
+<p align="center">
+  <img src="assets/banner.png" width="100%">
+</p>
 
-**Enterprise AI Application Platform**
+<h1 align="center">
+AI Studio
+</h1>
 
-AI Studio is a unified AIGC application platform for image generation, face swap, and AI chat through a modular service-oriented architecture.
+<p align="center">
+Enterprise AI Application Platform
+</p>
 
-> TODO: Replace with project banner.
->
-> Reserved asset: `assets/banner.png`
+<p align="center">
+FastAPI • Next.js • ComfyUI • FaceFusion • DeepSeek
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-009688)
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6)
-![License](https://img.shields.io/badge/License-Not%20specified-lightgrey)
-![Version](https://img.shields.io/badge/Version-v0.10.0-success)
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-0.116.1-009688" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Next.js-15-black" alt="Next.js">
+  <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Version-v0.10.0-success" alt="Version">
+  <img src="https://img.shields.io/badge/License-Not%20specified-lightgrey" alt="License">
+</p>
 
 ## Why AI Studio
 
@@ -29,19 +37,30 @@ The project focuses on platform design, runtime isolation, and maintainable arch
 
 ## Highlights
 
-| Area | What it provides |
+- **Enterprise AI Platform**: unifies image generation, face swap, and AI chat in one application structure.
+- **Text-to-Image**: generates images through ComfyUI workflows and backend model selection.
+- **Face Swap**: executes image-based face swap workflows through FaceFusion.
+- **AI Chat**: provides role-based conversations through DeepSeek and an OpenAI-compatible gateway.
+- **Streaming LLM**: forwards real upstream SSE responses instead of simulated streaming.
+- **Registry-based Architecture**: manages image models, workflow templates, LLM clients, and chat roles through registries.
+- **FastAPI Service Layer**: keeps API endpoints thin and delegates workflow logic to services.
+- **Modern Next.js UI**: provides focused pages for image generation, face swap, and chat workflows.
+
+## Screenshots
+
+| Home | AI Chat |
 | --- | --- |
-| Text-to-Image | Generate images through ComfyUI workflows and registry-managed model selection. |
-| Face Swap | Execute end-to-end face swap workflows with upload, processing, preview, and download. |
-| AI Chat | Interact with DeepSeek through real streaming conversations and role-based prompts. |
-| Modular Architecture | Keep image, face, and chat capabilities isolated behind service boundaries. |
-| Registry-based Management | Manage image models, workflows, LLM clients, and chat roles through registries. |
-| Streaming LLM | Use upstream SSE streaming instead of simulated token streaming. |
-| End-to-End Workflows | Connect browser UI, FastAPI APIs, service logic, and AI runtimes in one platform. |
+| <img src="assets/homepage.png" width="100%"> | <img src="assets/chat.png" width="100%"> |
+
+| Text to Image | Face Swap |
+| --- | --- |
+| <img src="assets/image-generation.png" width="100%"> | <img src="assets/face-swap.png" width="100%"> |
 
 ## Architecture
 
 AI Studio routes all user-facing workflows through a service layer. Image generation, face swap, and chat each have different runtime requirements, but the API layer stays consistent and lightweight. Runtime-specific details stay inside integration modules, so ComfyUI, FaceFusion, and DeepSeek can evolve independently from the application surface.
+
+<!-- If assets/architecture.svg is added later, it can replace the Mermaid diagram below. -->
 
 ```mermaid
 flowchart TD
@@ -124,20 +143,6 @@ The chat workflow uses real upstream streaming from the LLM provider. The backen
 ### Configuration Driven
 
 Runtime paths, provider URLs, model identifiers, file limits, timeout values, and environment-specific settings are managed through Pydantic Settings and local environment files.
-
-## Screenshots
-
-Real screenshots are not included in this repository snapshot.
-
-TODO: Add screenshots after capturing the current local web UI.
-
-| Page | Reserved asset |
-| --- | --- |
-| Homepage | `assets/homepage.png` |
-| Image Generation | `assets/image-generation.png` |
-| Face Swap | `assets/face-swap.png` |
-| AI Chat | `assets/chat.png` |
-| Architecture | `assets/architecture.svg` |
 
 ## Features
 
