@@ -1,7 +1,10 @@
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,16 @@ class FaceFusionExecutor:
     def execute(self, source_path: Path, target_path: Path, output_path: Path) -> ExecutionResult:
         command = self._build_command(source_path, target_path, output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(
+            "Executing FaceFusion CLI: source_path=%s target_path=%s output_path=%s "
+            "target_suffix=%s output_suffix=%s argv=%s",
+            source_path.resolve(),
+            target_path.resolve(),
+            output_path.resolve(),
+            target_path.suffix.lower(),
+            output_path.suffix.lower(),
+            command,
+        )
 
         started_at = monotonic()
         try:

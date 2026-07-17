@@ -131,6 +131,27 @@ def test_face_swap_task_lifecycle_and_result(monkeypatch: pytest.MonkeyPatch) ->
     assert result_response.headers["content-type"] == "image/png"
 
 
+def test_face_swap_output_extension_matches_jpeg_target(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_executor = FakeFaceFusionExecutor()
+    monkeypatch.setattr(face_swap_service, "_executor", fake_executor)
+
+    source_file_id = upload_test_file("source.jpg", "image/jpeg", "source_face")
+    target_file_id = upload_test_file("target.jpg", "image/jpeg", "target_image")
+
+    create_response = client.post(
+        "/api/v1/face-swap/tasks",
+        json={"source_file_id": source_file_id, "target_file_id": target_file_id},
+    )
+
+    assert create_response.status_code == 201
+    task_id = create_response.json()["task_id"]
+    final_payload = wait_for_terminal_task(task_id)
+
+    assert final_payload["status"] == "succeeded"
+    assert fake_executor.calls[0][2].name == "result.jpg"
+    assert final_payload["result"] is not None
+
+
 def test_face_swap_rejects_target_video_for_first_demo() -> None:
     source_file_id = upload_test_file("source.png", "image/png", "source_face")
     target_file_id = upload_test_file("target.png", "image/png", "target_video")

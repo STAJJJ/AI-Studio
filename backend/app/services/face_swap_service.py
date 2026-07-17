@@ -41,11 +41,11 @@ class FaceSwapService:
         return TaskResponse.from_record(task)
 
     def _run_task(self, task: TaskRecord) -> None:
-        output_path = self._build_output_path(task.id)
         try:
             self._tasks.mark_running(task.id, message="Running FaceFusion")
             source_path = Path(str(task.payload["source_path"]))
             target_path = Path(str(task.payload["target_path"]))
+            output_path = self._build_output_path(task.id, target_path)
             result = self._executor.execute(source_path=source_path, target_path=target_path, output_path=output_path)
             self._tasks.merge_payload(task.id, {"execution": self._execution_payload(result)})
 
@@ -54,7 +54,9 @@ class FaceSwapService:
             if not result.output_path.exists() or result.output_path.stat().st_size == 0:
                 raise FaceSwapExecutionError("FaceFusion completed without a valid output image")
 
-            metadata = self._files.register_task_output_file(task.id, result.output_path, content_type="image/png")
+            metadata = self._files.register_task_output_file(
+                task.id, result.output_path, content_type=self._content_type_for_output(result.output_path)
+            )
             self._tasks.merge_payload(
                 task.id,
                 {
@@ -88,9 +90,18 @@ class FaceSwapService:
             raise ValueError("target file does not exist on disk")
         return source, target
 
-    def _build_output_path(self, task_id: str) -> Path:
+    def _build_output_path(self, task_id: str, target_path: Path) -> Path:
         safe_task_id = Path(task_id).name
-        return self._files.output_dir / safe_task_id / "result.png"
+        target_suffix = target_path.suffix.lower()
+        if target_suffix not in {".jpg", ".jpeg", ".png"}:
+            raise ValueError(f"Unsupported target image extension: {target_suffix}")
+        return self._files.output_dir / safe_task_id / f"result{target_suffix}"
+
+    def _content_type_for_output(self, output_path: Path) -> str:
+        suffix = output_path.suffix.lower()
+        if suffix in {".jpg", ".jpeg"}:
+            return "image/jpeg"
+        return "image/png"
 
     def _execution_payload(self, result: ExecutionResult) -> dict[str, object]:
         return {
