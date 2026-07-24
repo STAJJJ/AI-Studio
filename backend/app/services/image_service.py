@@ -1,12 +1,11 @@
 import uuid
-from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.services.comfyui.client import ComfyUIClient
+from app.services.comfyui.client import ComfyUIClient, ComfyUIImage
 from app.services.comfyui.model_registry import ImageModelRegistry
 from app.schemas.history import WorkflowRunStatus, WorkflowType
 from app.services.comfyui.workflow import ComfyUIWorkflowTemplate
@@ -17,11 +16,11 @@ from app.services.history.service import WorkflowHistoryService, workflow_histor
 ImageTaskStatus = Literal["pending", "running", "completed", "failed"]
 
 
-class ImageResultNotFoundError(FileNotFoundError):
+class InvalidImageResultError(ValueError):
     pass
 
 
-class InvalidImageResultError(ValueError):
+class ImageCheckpointNotFoundError(ValueError):
     pass
 
 
@@ -49,16 +48,15 @@ class ImageService:
         self,
         client: ComfyUIClient,
         model_registry: ImageModelRegistry | None = None,
-        output_dir: Path | None = None,
         history_service: WorkflowHistoryService | None = None,
     ) -> None:
         self._client = client
         self._model_registry = model_registry or ImageModelRegistry()
-        self._output_dir = output_dir or get_settings().comfyui_output_dir
         self._history = history_service or workflow_history_service
 
     def generate_image(self, request: ImageGenerationRequest) -> ImageGenerationResponse:
         model = self._model_registry.get_model(request.model)
+        self._ensure_checkpoint_available(model.checkpoint)
         workflow_template = ComfyUIWorkflowTemplate(self._model_registry.get_workflow_path(model.id))
         workflow = workflow_template.render(
             prompt=request.prompt,
@@ -129,16 +127,14 @@ class ImageService:
         self._update_history_if_present(task_id, status=WorkflowRunStatus.running, progress=50)
         return ImageGenerationStatus(task_id=task_id, status="running", progress=50, image_url=None)
 
-    def get_result_path(self, filename: str) -> Path:
+    def get_result_image(self, filename: str) -> ComfyUIImage:
         if not filename or "/" in filename or "\\" in filename or filename in {".", ".."}:
             raise InvalidImageResultError("Invalid image filename")
-        path = (self._output_dir / filename).resolve()
-        output_root = self._output_dir.resolve()
-        if output_root not in path.parents and path != output_root:
-            raise InvalidImageResultError("Invalid image filename")
-        if not path.is_file():
-            raise ImageResultNotFoundError(f"Image result not found: {filename}")
-        return path
+        return self._client.get_image(filename=filename)
+
+    def _ensure_checkpoint_available(self, checkpoint: str) -> None:
+        if checkpoint not in self._client.list_checkpoints():
+            raise ImageCheckpointNotFoundError(f"ComfyUI checkpoint is not installed: {checkpoint}")
 
     def _update_history_if_present(self, task_id: str, **changes: object) -> None:
         try:
@@ -190,17 +186,16 @@ def _build_default_client() -> ComfyUIClient:
     return ComfyUIClient(base_url=settings.comfyui_base_url, timeout_seconds=settings.comfyui_timeout_seconds)
 
 
-def _build_default_output_dir() -> Path:
-    return get_settings().comfyui_output_dir
-
-
 def _build_default_model_registry() -> ImageModelRegistry:
     settings = get_settings()
-    return ImageModelRegistry(default_model_id=settings.default_image_model)
+    return ImageModelRegistry(
+        default_model_id=settings.default_image_model,
+        sd15_checkpoint=settings.sd15_checkpoint,
+        sdxl_lightning_checkpoint=settings.sdxl_lightning_checkpoint,
+    )
 
 
 image_service = ImageService(
     client=_build_default_client(),
     model_registry=_build_default_model_registry(),
-    output_dir=_build_default_output_dir(),
 )

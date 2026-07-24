@@ -1,31 +1,19 @@
 {
   "1": {
     "class_type": "CheckpointLoaderSimple",
-    "inputs": {
-      "ckpt_name": "{{checkpoint}}"
-    }
+    "inputs": {"ckpt_name": "{{checkpoint}}"}
   },
   "2": {
     "class_type": "CLIPTextEncode",
-    "inputs": {
-      "clip": ["1", 1],
-      "text": "{{prompt}}"
-    }
+    "inputs": {"clip": ["1", 1], "text": "{{prompt}}"}
   },
   "3": {
     "class_type": "CLIPTextEncode",
-    "inputs": {
-      "clip": ["1", 1],
-      "text": ""
-    }
+    "inputs": {"clip": ["1", 1], "text": ""}
   },
   "4": {
     "class_type": "EmptyLatentImage",
-    "inputs": {
-      "width": "{{width}}",
-      "height": "{{height}}",
-      "batch_size": 1
-    }
+    "inputs": {"width": "{{width}}", "height": "{{height}}", "batch_size": 1}
   },
   "5": {
     "class_type": "KSampler",
@@ -35,7 +23,7 @@
       "steps": 4,
       "cfg": 1.0,
       "sampler_name": "euler",
-      "scheduler": "simple",
+      "scheduler": "sgm_uniform",
       "positive": ["2", 0],
       "negative": ["3", 0],
       "latent_image": ["4", 0],
@@ -44,16 +32,10 @@
   },
   "6": {
     "class_type": "VAEDecode",
-    "inputs": {
-      "samples": ["5", 0],
-      "vae": ["1", 2]
-    }
+    "inputs": {"samples": ["5", 0], "vae": ["1", 2]}
   },
   "7": {
     "class_type": "SaveImage",
-    "inputs": {
-      "filename_prefix": "AIStudio_FLUX1_schnell_fp8",
-      "images": ["6", 0]
-    }
+    "inputs": {"filename_prefix": "AIStudio_SDXL_Lightning_4Step", "images": ["6", 0]}
   }
 }

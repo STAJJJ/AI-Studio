@@ -121,7 +121,7 @@ Generate images through ComfyUI workflows. AI Studio selects the target model th
 Current registry entries:
 
 - Stable Diffusion 1.5
-- FLUX.1 Schnell FP8, when the checkpoint is available locally
+- SDXL Lightning 4-Step, when the checkpoint is available in ComfyUI
 
 ### Face Swap
 
@@ -138,7 +138,7 @@ Image generation and face swap runs are stored in SQLite and displayed in a unif
 | Frontend | Next.js 15, React 19, TypeScript strict mode, Tailwind CSS, local shadcn-style primitives |
 | Backend | Python 3.12, FastAPI, Pydantic Settings, SQLAlchemy, Uvicorn, pytest |
 | Persistence | SQLite |
-| Image Runtime | ComfyUI, SD1.5 workflow, FLUX workflow support |
+| Image Runtime | ComfyUI, SD1.5 workflow, SDXL Lightning 4-Step workflow |
 | Face Runtime | FaceFusion CLI executor |
 | LLM Runtime | DeepSeek through Volcengine Ark, OpenAI-compatible chat completions, SSE streaming |
 
@@ -236,8 +236,9 @@ Backend API docs: http://127.0.0.1:8002/docs
 | `AI_STUDIO_OUTPUT_DIR` | Local Face Swap output directory |
 | `AI_STUDIO_DATABASE_URL` | SQLite database URL |
 | `AI_STUDIO_DEFAULT_IMAGE_MODEL` | Default image registry key, usually `sd15` |
-| `AI_STUDIO_COMFYUI_BASE_URL` | ComfyUI HTTP API URL |
-| `AI_STUDIO_COMFYUI_OUTPUT_DIR` | ComfyUI output directory used for result lookup |
+| `AI_STUDIO_SD15_CHECKPOINT` | SD1.5 checkpoint filename registered in ComfyUI |
+| `AI_STUDIO_SDXL_LIGHTNING_CHECKPOINT` | SDXL Lightning 4-Step checkpoint filename registered in ComfyUI |
+| `COMFYUI_BASE_URL` | ComfyUI HTTP API URL. `AI_STUDIO_COMFYUI_BASE_URL` is deprecated |
 | `AI_STUDIO_FACEFUSION_PROJECT_PATH` | Local FaceFusion project path |
 | `AI_STUDIO_FACEFUSION_PYTHON_PATH` | Python executable used to run FaceFusion |
 | `AI_STUDIO_FACEFUSION_EXECUTION_PROVIDER` | FaceFusion execution provider, for example `cpu` or `coreml` |
@@ -309,7 +310,7 @@ curl http://127.0.0.1:8002/api/v1/health
 
 - The project is a local portfolio application and does not include authentication or multi-user isolation.
 - ComfyUI and FaceFusion are external local runtimes and are not installed by this repository.
-- FLUX generation requires the corresponding local checkpoint.
+- SDXL Lightning generation requires the corresponding checkpoint in ComfyUI.
 - Chat requires a valid OpenAI-compatible DeepSeek provider configuration.
 - Workflow History stores metadata in SQLite, not a production database.
 - Docker deployment is intentionally out of scope for this release.

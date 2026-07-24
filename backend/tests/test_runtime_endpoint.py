@@ -25,10 +25,10 @@ def test_runtime_endpoint_returns_current_image_model() -> None:
                 "height": 512,
             },
             {
-                "id": "flux",
-                "name": "FLUX.1 Schnell FP8",
-                "width": 1024,
-                "height": 1024,
+                "id": "sdxl-lightning-4step",
+                "name": "SDXL Lightning 4-Step",
+                "width": 768,
+                "height": 768,
             },
         ],
     }

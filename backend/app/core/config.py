@@ -3,11 +3,13 @@ from pathlib import Path
 import sys
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_SD15_CHECKPOINT = "v1-5-pruned-emaonly-fp16.safetensors"
+DEFAULT_SDXL_LIGHTNING_CHECKPOINT = "sdxl_lightning_4step.safetensors"
 
 
 class Settings(BaseSettings):
@@ -34,9 +36,17 @@ class Settings(BaseSettings):
 
     default_image_model: str = Field(default="sd15")
     runtime_gpu_name: str = Field(default="Apple Silicon MPS")
-    comfyui_base_url: str = Field(default="http://127.0.0.1:8188")
+    sd15_checkpoint: str = Field(default=DEFAULT_SD15_CHECKPOINT)
+    sdxl_lightning_checkpoint: str = Field(default=DEFAULT_SDXL_LIGHTNING_CHECKPOINT)
+    comfyui_base_url: str = Field(
+        default="http://127.0.0.1:8188",
+        validation_alias=AliasChoices("COMFYUI_BASE_URL", "AI_STUDIO_COMFYUI_BASE_URL"),
+    )
     comfyui_timeout_seconds: int = Field(default=120)
-    comfyui_output_dir: Path = Field(default=PROJECT_ROOT.parent / "ComfyUI" / "output")
+    comfyui_output_dir: Path | None = Field(
+        default=None,
+        description="Deprecated compatibility setting; image results are fetched through the ComfyUI HTTP API.",
+    )
 
     llm_base_url: str = Field(default="https://ark.cn-beijing.volces.com/api/v3")
     llm_api_key: str = Field(default="")

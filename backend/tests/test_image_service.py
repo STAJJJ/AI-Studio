@@ -1,17 +1,29 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from app.services.comfyui.model_registry import ImageModelRegistry
+from app.services.comfyui.client import ComfyUIImage
 from app.schemas.history import WorkflowRunStatus, WorkflowType
 from app.services.history.memory_repository import InMemoryWorkflowHistoryRepository
 from app.services.history.service import WorkflowHistoryService
-from app.services.image_service import ImageGenerationRequest, ImageGenerationStatus, ImageService
+from app.services.image_service import (
+    ImageCheckpointNotFoundError,
+    ImageGenerationRequest,
+    ImageGenerationStatus,
+    ImageService,
+)
 
 
 class FakeComfyUIClient:
     def __init__(self) -> None:
         self.submitted_workflow = None
         self.history = {}
+        self.available_checkpoints = {
+            "v1-5-pruned-emaonly-fp16.safetensors",
+            "sdxl_lightning_4step.safetensors",
+        }
 
     def submit_workflow(self, workflow):
         self.submitted_workflow = workflow
@@ -19,6 +31,12 @@ class FakeComfyUIClient:
 
     def get_history(self, task_id):
         return self.history
+
+    def get_image(self, filename, subfolder="", image_type="output"):
+        return ComfyUIImage(content=b"remote-png", content_type="image/png", filename=filename)
+
+    def list_checkpoints(self):
+        return self.available_checkpoints
 
 
 def test_image_service_loads_template_and_submits_rendered_workflow(tmp_path: Path) -> None:
@@ -96,10 +114,10 @@ def test_image_service_uses_unique_seed_and_filename_prefix_for_each_submission(
     assert first_prefix != second_prefix
 
 
-def test_image_service_uses_requested_flux_model(tmp_path: Path) -> None:
+def test_image_service_uses_requested_sdxl_lightning_model(tmp_path: Path) -> None:
     template_dir = tmp_path / "templates"
     template_dir.mkdir()
-    (template_dir / "flux1_schnell_fp8_text_to_image.json").write_text(
+    (template_dir / "sdxl_lightning_4step_text_to_image.json").write_text(
         json.dumps(
             {
                 "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "{{checkpoint}}"}},
@@ -111,10 +129,42 @@ def test_image_service_uses_requested_flux_model(tmp_path: Path) -> None:
     registry = ImageModelRegistry(default_model_id="sd15", template_dir=template_dir)
     service = ImageService(client=client, model_registry=registry)
 
-    service.generate_image(ImageGenerationRequest(prompt="A portrait", model="flux"))
+    service.generate_image(ImageGenerationRequest(prompt="A portrait", model="sdxl-lightning-4step"))
 
-    assert client.submitted_workflow["1"]["inputs"]["ckpt_name"] == "flux1-schnell-fp8.safetensors"
-    assert client.submitted_workflow["2"]["inputs"] == {"width": 1024, "height": 1024}
+    assert client.submitted_workflow["1"]["inputs"]["ckpt_name"] == "sdxl_lightning_4step.safetensors"
+    assert client.submitted_workflow["2"]["inputs"] == {"width": 768, "height": 768}
+
+
+def test_sdxl_lightning_workflow_uses_required_sampler_settings() -> None:
+    client = FakeComfyUIClient()
+    service = ImageService(
+        client=client,
+        history_service=WorkflowHistoryService(InMemoryWorkflowHistoryRepository()),
+    )
+
+    service.generate_image(ImageGenerationRequest(prompt="A portrait", model="sdxl-lightning-4step"))
+
+    sampler = next(
+        node["inputs"]
+        for node in client.submitted_workflow.values()
+        if node.get("class_type") == "KSampler"
+    )
+    assert sampler["steps"] == 4
+    assert sampler["cfg"] == 1.0
+    assert sampler["sampler_name"] == "euler"
+    assert sampler["scheduler"] == "sgm_uniform"
+
+
+def test_image_service_rejects_missing_checkpoint() -> None:
+    client = FakeComfyUIClient()
+    client.available_checkpoints = set()
+    service = ImageService(
+        client=client,
+        history_service=WorkflowHistoryService(InMemoryWorkflowHistoryRepository()),
+    )
+
+    with pytest.raises(ImageCheckpointNotFoundError, match="v1-5-pruned-emaonly-fp16.safetensors"):
+        service.generate_image(ImageGenerationRequest(prompt="A portrait", model="sd15"))
 
 
 def test_image_service_returns_running_when_history_is_not_ready() -> None:
@@ -168,15 +218,15 @@ def test_image_service_returns_failed_when_comfyui_reports_error() -> None:
     assert status.image_url is None
 
 
-def test_image_service_resolves_output_file_without_copying(tmp_path: Path) -> None:
-    output_dir = tmp_path / "output"
-    output_dir.mkdir()
-    image_path = output_dir / "result.png"
-    image_path.write_bytes(b"png")
+def test_image_service_reads_result_through_comfyui_http_api() -> None:
     client = FakeComfyUIClient()
-    service = ImageService(client=client, output_dir=output_dir)
+    service = ImageService(client=client)
 
-    assert service.get_result_path("result.png") == image_path
+    image = service.get_result_image("result.png")
+
+    assert image.content == b"remote-png"
+    assert image.content_type == "image/png"
+    assert image.filename == "result.png"
 
 
 def test_image_service_creates_history_without_internal_workflow_payload(tmp_path: Path) -> None:

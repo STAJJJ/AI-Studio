@@ -28,7 +28,11 @@ class RuntimeResponse(BaseModel):
 @router.get("", response_model=RuntimeResponse)
 def get_runtime() -> RuntimeResponse:
     settings = get_settings()
-    registry = ImageModelRegistry(default_model_id=settings.default_image_model)
+    registry = ImageModelRegistry(
+        default_model_id=settings.default_image_model,
+        sd15_checkpoint=settings.sd15_checkpoint,
+        sdxl_lightning_checkpoint=settings.sdxl_lightning_checkpoint,
+    )
     current_model = registry.get_default_model()
     return RuntimeResponse(
         current_model=current_model.name,

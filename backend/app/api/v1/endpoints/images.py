@@ -1,14 +1,16 @@
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import FileResponse
+from urllib.parse import quote
 
-from app.services.comfyui.client import ComfyUIClientError
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import Response
+
+from app.services.comfyui.client import ComfyUIClientError, ComfyUIImageNotFoundError, ComfyUIUnavailableError
 from app.services.comfyui.model_registry import UnknownImageModelError
 from app.services.comfyui.workflow import WorkflowTemplateError
 from app.services.image_service import (
     ImageGenerationRequest,
     ImageGenerationResponse,
     ImageGenerationStatus,
-    ImageResultNotFoundError,
+    ImageCheckpointNotFoundError,
     InvalidImageResultError,
     image_service,
 )
@@ -24,6 +26,10 @@ def generate_image(request: ImageGenerationRequest) -> ImageGenerationResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except WorkflowTemplateError as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    except ImageCheckpointNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except ComfyUIUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except ComfyUIClientError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
@@ -32,16 +38,26 @@ def generate_image(request: ImageGenerationRequest) -> ImageGenerationResponse:
 def get_image_task_status(task_id: str) -> ImageGenerationStatus:
     try:
         return image_service.get_generation_status(task_id)
+    except ComfyUIUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except ComfyUIClientError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.get("/result/{filename}")
-def get_image_result(filename: str) -> FileResponse:
+def get_image_result(filename: str) -> Response:
     try:
-        result_path = image_service.get_result_path(filename)
-        return FileResponse(path=result_path, media_type="image/png", filename=filename)
+        image = image_service.get_result_image(filename)
+        return Response(
+            content=image.content,
+            media_type=image.content_type,
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(image.filename)}"},
+        )
     except InvalidImageResultError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except ImageResultNotFoundError as exc:
+    except ComfyUIImageNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ComfyUIUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except ComfyUIClientError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

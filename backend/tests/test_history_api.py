@@ -2,7 +2,9 @@ from fastapi.testclient import TestClient
 from uuid import uuid4
 
 from app.main import app
+from app.api.v1.endpoints import history as history_endpoint
 from app.schemas.history import WorkflowRunCreate, WorkflowRunStatus, WorkflowType
+from app.services.comfyui.client import ComfyUIImage
 from app.services.history.service import workflow_history_service
 
 client = TestClient(app)
@@ -70,3 +72,37 @@ def test_history_detail_endpoint_returns_404_for_missing_run() -> None:
     response = client.get("/api/v1/history/run_missing")
 
     assert response.status_code == 404
+
+
+def test_history_detail_keeps_removed_flux_provider_readable() -> None:
+    run = create_history_run("Legacy Flux")
+    workflow_history_service.update_run(
+        run.id,
+        provider="flux",
+        input_payload={"model": "flux", "prompt": "legacy image"},
+    )
+
+    response = client.get(f"/api/v1/history/{run.id}")
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "flux"
+    assert response.json()["input_payload"]["model"] == "flux"
+
+
+def test_history_image_result_is_proxied_through_fastapi(monkeypatch) -> None:
+    run = create_history_run("Remote Image")
+    workflow_history_service.update_run(run.id, result_file_id="image:remote.png")
+
+    class FakeRemoteImageService:
+        def get_result_image(self, filename):
+            assert filename == "remote.png"
+            return ComfyUIImage(content=b"remote-png", content_type="image/png", filename=filename)
+
+    monkeypatch.setattr(history_endpoint, "image_service", FakeRemoteImageService())
+
+    response = client.get(f"/api/v1/history/{run.id}/result")
+
+    assert response.status_code == 200
+    assert response.content == b"remote-png"
+    assert response.headers["content-type"] == "image/png"
+    assert "remote.png" in response.headers["content-disposition"]

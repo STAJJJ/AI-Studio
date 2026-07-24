@@ -14,7 +14,7 @@ import type { GenerateImageRequest, RuntimeModel } from "@/types/image";
 
 const fallbackModels: RuntimeModel[] = [
   { id: "sd15", name: "Stable Diffusion 1.5", width: 512, height: 512 },
-  { id: "flux", name: "FLUX.1 Schnell FP8", width: 1024, height: 1024 },
+  { id: "sdxl-lightning-4step", name: "SDXL Lightning 4-Step", width: 768, height: 768 },
 ];
 const defaultPrompt =
   "A cinematic portrait of a young man in a modern studio, realistic photography, soft lighting, detailed face";
